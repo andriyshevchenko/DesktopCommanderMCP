@@ -124,334 +124,352 @@ ALLOWED_DIRS = [
     '${escapedTempDir}',
 ]
 
-# Store original functions
-_original_open = open
-_original_listdir = os.listdir
-_original_mkdir = os.mkdir
-_original_makedirs = os.makedirs
-_original_remove = os.remove
-_original_rmdir = os.rmdir
-_original_unlink = os.unlink
-_original_rename = os.rename
-_original_replace = os.replace
-_original_symlink = os.symlink
-_original_link = os.link
-_original_chmod = os.chmod
-_original_chown = os.chown
-
-def _is_path_allowed(filepath):
-    """Check if a file path is within allowed directories
-    
-    Uses realpath to resolve symbolic links and prevent path traversal attacks.
-    Performs case-insensitive comparison on Windows.
-    """
+# Setup sandbox in a function to hide internals from user code
+def _setup_sandbox():
+    # Store original functions in closure
+    _original_open = open
+    _original_listdir = os.listdir
+    _original_mkdir = os.mkdir
+    _original_makedirs = os.makedirs
+    _original_remove = os.remove
+    _original_rmdir = os.rmdir
+    _original_unlink = os.unlink
+    _original_rename = os.rename
+    _original_replace = os.replace
+    _original_symlink = os.symlink
+    _original_link = os.link
+    _original_chmod = os.chmod
     try:
-        # Use realpath to resolve symlinks and normalize path
-        real_path = os.path.realpath(os.path.expanduser(filepath))
+        _original_chown = os.chown
+    except AttributeError:
+        _original_chown = None
+    
+    def _is_path_allowed(filepath):
+        """Check if a file path is within allowed directories
         
-        # On Windows, make comparison case-insensitive
-        if sys.platform == 'win32':
-            real_path = real_path.lower()
+        Uses realpath to resolve symbolic links and prevent path traversal attacks.
+        Performs case-insensitive comparison on Windows.
+        """
+        try:
+            # Convert PathLike objects to string
+            filepath = os.fspath(filepath) if hasattr(os, 'fspath') else str(filepath)
+            # Use realpath to resolve symlinks and normalize path
+            real_path = os.path.realpath(os.path.expanduser(filepath))
             
-        for allowed_dir in ALLOWED_DIRS:
-            allowed_real = os.path.realpath(os.path.expanduser(allowed_dir))
+            # On Windows, make comparison case-insensitive
             if sys.platform == 'win32':
-                allowed_real = allowed_real.lower()
+                real_path = real_path.lower()
                 
-            # Ensure the path actually starts with the allowed directory
-            # Add separator to prevent partial matches (e.g., /tmp/x not matching /tmp/xyz)
-            if real_path == allowed_real or real_path.startswith(allowed_real + os.sep):
-                return True
-        return False
-    except (OSError, ValueError) as exc:
-        sys.stderr.write(f"[sandbox] _is_path_allowed error for {filepath!r}: {exc}\\n")
-        return False
-    except Exception as exc:
-        sys.stderr.write(f"[sandbox] unexpected error in _is_path_allowed for {filepath!r}: {exc}\\n")
-        return False
-
-def _safe_open(file, mode='r', *args, **kwargs):
-    """Wrapped open function that checks path access for both read and write"""
-    # Allow reading from standard streams
-    if file in (0, 1, 2) or hasattr(file, 'read'):
+            for allowed_dir in ALLOWED_DIRS:
+                allowed_real = os.path.realpath(os.path.expanduser(allowed_dir))
+                if sys.platform == 'win32':
+                    allowed_real = allowed_real.lower()
+                    
+                # Ensure the path actually starts with the allowed directory
+                # Add separator to prevent partial matches (e.g., /tmp/x not matching /tmp/xyz)
+                if real_path == allowed_real or real_path.startswith(allowed_real + os.sep):
+                    return True
+            return False
+        except (OSError, ValueError, TypeError) as exc:
+            sys.stderr.write(f"[sandbox] _is_path_allowed error for {filepath!r}: {exc}\\n")
+            return False
+        except Exception as exc:
+            sys.stderr.write(f"[sandbox] unexpected error in _is_path_allowed for {filepath!r}: {exc}\\n")
+            return False
+    
+    def _safe_open(file, mode='r', *args, **kwargs):
+        """Wrapped open function that checks path access for both read and write"""
+        # Allow reading from standard streams
+        if file in (0, 1, 2) or hasattr(file, 'read'):
+            return _original_open(file, mode, *args, **kwargs)
+        
+        # Check if path is allowed for all file operations
+        if not _is_path_allowed(file):
+            raise PermissionError(f"Access denied: {file} is outside allowed directories")
+        
         return _original_open(file, mode, *args, **kwargs)
     
-    # Check if path is allowed for all file operations
-    if not _is_path_allowed(file):
-        raise PermissionError(f"Access denied: {file} is outside allowed directories")
-    
-    return _original_open(file, mode, *args, **kwargs)
-
-def _safe_listdir(path='.'):
-    """Wrapped listdir that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_listdir(path)
-
-def _safe_mkdir(path, *args, **kwargs):
-    """Wrapped mkdir that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_mkdir(path, *args, **kwargs)
-
-def _safe_makedirs(name, *args, **kwargs):
-    """Wrapped makedirs that checks path access"""
-    if not _is_path_allowed(name):
-        raise PermissionError(f"Access denied: {name} is outside allowed directories")
-    return _original_makedirs(name, *args, **kwargs)
-
-def _safe_remove(path):
-    """Wrapped remove that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_remove(path)
-
-def _safe_rmdir(path):
-    """Wrapped rmdir that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_rmdir(path)
-
-def _safe_unlink(path):
-    """Wrapped unlink that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_unlink(path)
-
-def _safe_rename(src, dst):
-    """Wrapped rename that checks both source and destination paths"""
-    if not _is_path_allowed(src):
-        raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-    if not _is_path_allowed(dst):
-        raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-    return _original_rename(src, dst)
-
-def _safe_replace(src, dst):
-    """Wrapped replace that checks both source and destination paths"""
-    if not _is_path_allowed(src):
-        raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-    if not _is_path_allowed(dst):
-        raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-    return _original_replace(src, dst)
-
-def _safe_symlink(src, dst):
-    """Wrapped symlink that checks destination path.
-    
-    os.symlink(src, dst) creates a symlink at dst pointing to src.
-    We only check dst (where the symlink is created) is within allowed directories.
-    """
-    if not _is_path_allowed(dst):
-        raise PermissionError(f"Access denied: {dst} is outside allowed directories")
-    return _original_symlink(src, dst)
-
-def _safe_link(src, dst):
-    """Wrapped link that checks both source and destination paths"""
-    if not _is_path_allowed(src):
-        raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-    if not _is_path_allowed(dst):
-        raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-    return _original_link(src, dst)
-
-def _safe_chmod(path, mode):
-    """Wrapped chmod that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_chmod(path, mode)
-
-def _safe_chown(path, uid, gid):
-    """Wrapped chown that checks path access"""
-    if not _is_path_allowed(path):
-        raise PermissionError(f"Access denied: {path} is outside allowed directories")
-    return _original_chown(path, uid, gid)
-
-# Replace built-in functions
-import builtins
-builtins.open = _safe_open
-os.listdir = _safe_listdir
-os.mkdir = _safe_mkdir
-os.makedirs = _safe_makedirs
-os.remove = _safe_remove
-os.rmdir = _safe_rmdir
-os.unlink = _safe_unlink
-os.rename = _safe_rename
-os.replace = _safe_replace
-os.symlink = _safe_symlink
-os.link = _safe_link
-os.chmod = _safe_chmod
-os.chown = _safe_chown
-
-# Wrap shutil functions that perform filesystem operations
-try:
-    import shutil
-    _original_shutil_copy = shutil.copy
-    _original_shutil_copy2 = shutil.copy2
-    _original_shutil_copyfile = shutil.copyfile
-    _original_shutil_move = shutil.move
-    _original_shutil_rmtree = shutil.rmtree
-    _original_shutil_copytree = shutil.copytree
-    
-    def _safe_shutil_copy(src, dst, *args, **kwargs):
-        if not _is_path_allowed(src):
-            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-        if not _is_path_allowed(dst):
-            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-        return _original_shutil_copy(src, dst, *args, **kwargs)
-    
-    def _safe_shutil_copy2(src, dst, *args, **kwargs):
-        if not _is_path_allowed(src):
-            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-        if not _is_path_allowed(dst):
-            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-        return _original_shutil_copy2(src, dst, *args, **kwargs)
-    
-    def _safe_shutil_copyfile(src, dst, *args, **kwargs):
-        if not _is_path_allowed(src):
-            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-        if not _is_path_allowed(dst):
-            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-        return _original_shutil_copyfile(src, dst, *args, **kwargs)
-    
-    def _safe_shutil_move(src, dst, *args, **kwargs):
-        if not _is_path_allowed(src):
-            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
-        if not _is_path_allowed(dst):
-            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-        return _original_shutil_move(src, dst, *args, **kwargs)
-    
-    def _safe_shutil_rmtree(path, *args, **kwargs):
+    def _safe_listdir(path='.'):
+        """Wrapped listdir that checks path access"""
         if not _is_path_allowed(path):
             raise PermissionError(f"Access denied: {path} is outside allowed directories")
-        return _original_shutil_rmtree(path, *args, **kwargs)
+        return _original_listdir(path)
     
-    def _safe_shutil_copytree(src, dst, *args, **kwargs):
+    def _safe_mkdir(path, *args, **kwargs):
+        """Wrapped mkdir that checks path access"""
+        if not _is_path_allowed(path):
+            raise PermissionError(f"Access denied: {path} is outside allowed directories")
+        return _original_mkdir(path, *args, **kwargs)
+    
+    def _safe_makedirs(name, *args, **kwargs):
+        """Wrapped makedirs that checks path access"""
+        if not _is_path_allowed(name):
+            raise PermissionError(f"Access denied: {name} is outside allowed directories")
+        return _original_makedirs(name, *args, **kwargs)
+    
+    def _safe_remove(path):
+        """Wrapped remove that checks path access"""
+        if not _is_path_allowed(path):
+            raise PermissionError(f"Access denied: {path} is outside allowed directories")
+        return _original_remove(path)
+    
+    def _safe_rmdir(path):
+        """Wrapped rmdir that checks path access"""
+        if not _is_path_allowed(path):
+            raise PermissionError(f"Access denied: {path} is outside allowed directories")
+        return _original_rmdir(path)
+    
+    def _safe_unlink(path):
+        """Wrapped unlink that checks path access"""
+        if not _is_path_allowed(path):
+            raise PermissionError(f"Access denied: {path} is outside allowed directories")
+        return _original_unlink(path)
+    
+    def _safe_rename(src, dst):
+        """Wrapped rename that checks both source and destination paths"""
         if not _is_path_allowed(src):
             raise PermissionError(f"Access denied: source {src} is outside allowed directories")
         if not _is_path_allowed(dst):
             raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
-        return _original_shutil_copytree(src, dst, *args, **kwargs)
+        return _original_rename(src, dst)
     
-    shutil.copy = _safe_shutil_copy
-    shutil.copy2 = _safe_shutil_copy2
-    shutil.copyfile = _safe_shutil_copyfile
-    shutil.move = _safe_shutil_move
-    shutil.rmtree = _safe_shutil_rmtree
-    shutil.copytree = _safe_shutil_copytree
-except ImportError:
-    pass  # shutil not available
+    def _safe_replace(src, dst):
+        """Wrapped replace that checks both source and destination paths"""
+        if not _is_path_allowed(src):
+            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+        if not _is_path_allowed(dst):
+            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+        return _original_replace(src, dst)
+    
+    def _safe_symlink(src, dst):
+        """Wrapped symlink that checks destination path.
+        
+        os.symlink(src, dst) creates a symlink at dst pointing to src.
+        We only check dst (where the symlink is created) is within allowed directories.
+        """
+        if not _is_path_allowed(dst):
+            raise PermissionError(f"Access denied: {dst} is outside allowed directories")
+        return _original_symlink(src, dst)
+    
+    def _safe_link(src, dst):
+        """Wrapped link that checks both source and destination paths"""
+        if not _is_path_allowed(src):
+            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+        if not _is_path_allowed(dst):
+            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+        return _original_link(src, dst)
+    
+    def _safe_chmod(path, mode):
+        """Wrapped chmod that checks path access"""
+        if not _is_path_allowed(path):
+            raise PermissionError(f"Access denied: {path} is outside allowed directories")
+        return _original_chmod(path, mode)
+    
+    def _safe_chown(path, uid, gid):
+        """Wrapped chown that checks path access"""
+        if _original_chown is None:
+            raise AttributeError("os.chown is not available on this platform")
+        if not _is_path_allowed(path):
+            raise PermissionError(f"Access denied: {path} is outside allowed directories")
+        return _original_chown(path, uid, gid)
+    
+    # Replace built-in functions
+    import builtins
+    builtins.open = _safe_open
+    os.listdir = _safe_listdir
+    os.mkdir = _safe_mkdir
+    os.makedirs = _safe_makedirs
+    os.remove = _safe_remove
+    os.rmdir = _safe_rmdir
+    os.unlink = _safe_unlink
+    os.rename = _safe_rename
+    os.replace = _safe_replace
+    os.symlink = _safe_symlink
+    os.link = _safe_link
+    os.chmod = _safe_chmod
+    if _original_chown is not None:
+        os.chown = _safe_chown
+    
+    # Wrap shutil functions that perform filesystem operations
+    try:
+        import shutil
+        _original_shutil_copy = shutil.copy
+        _original_shutil_copy2 = shutil.copy2
+        _original_shutil_copyfile = shutil.copyfile
+        _original_shutil_move = shutil.move
+        _original_shutil_rmtree = shutil.rmtree
+        _original_shutil_copytree = shutil.copytree
+        
+        def _safe_shutil_copy(src, dst, *args, **kwargs):
+            if not _is_path_allowed(src):
+                raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+            if not _is_path_allowed(dst):
+                raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+            return _original_shutil_copy(src, dst, *args, **kwargs)
+        
+        def _safe_shutil_copy2(src, dst, *args, **kwargs):
+            if not _is_path_allowed(src):
+                raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+            if not _is_path_allowed(dst):
+                raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+            return _original_shutil_copy2(src, dst, *args, **kwargs)
+        
+        def _safe_shutil_copyfile(src, dst, *args, **kwargs):
+            if not _is_path_allowed(src):
+                raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+            if not _is_path_allowed(dst):
+                raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+            return _original_shutil_copyfile(src, dst, *args, **kwargs)
+        
+        def _safe_shutil_move(src, dst, *args, **kwargs):
+            if not _is_path_allowed(src):
+                raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+            if not _is_path_allowed(dst):
+                raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+            return _original_shutil_move(src, dst, *args, **kwargs)
+        
+        def _safe_shutil_rmtree(path, *args, **kwargs):
+            if not _is_path_allowed(path):
+                raise PermissionError(f"Access denied: {path} is outside allowed directories")
+            return _original_shutil_rmtree(path, *args, **kwargs)
+        
+        def _safe_shutil_copytree(src, dst, *args, **kwargs):
+            if not _is_path_allowed(src):
+                raise PermissionError(f"Access denied: source {src} is outside allowed directories")
+            if not _is_path_allowed(dst):
+                raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
+            return _original_shutil_copytree(src, dst, *args, **kwargs)
+        
+        shutil.copy = _safe_shutil_copy
+        shutil.copy2 = _safe_shutil_copy2
+        shutil.copyfile = _safe_shutil_copyfile
+        shutil.move = _safe_shutil_move
+        shutil.rmtree = _safe_shutil_rmtree
+        shutil.copytree = _safe_shutil_copytree
+    except ImportError:
+        pass  # shutil not available
+    
+    # Wrap pathlib.Path methods
+    try:
+        import pathlib
+        from pathlib import Path as _OriginalPath
+        
+        # Get the concrete Path class (PosixPath or WindowsPath)
+        _ConcretePathClass = type(_OriginalPath())
+        
+        class _SafePath(_ConcretePathClass):
+            def _check_access(self):
+                if not _is_path_allowed(str(self)):
+                    raise PermissionError(f"Access denied: {self} is outside allowed directories")
+            
+            def touch(self, *args, **kwargs):
+                self._check_access()
+                return super().touch(*args, **kwargs)
+            
+            def write_text(self, *args, **kwargs):
+                self._check_access()
+                return super().write_text(*args, **kwargs)
+            
+            def write_bytes(self, *args, **kwargs):
+                self._check_access()
+                return super().write_bytes(*args, **kwargs)
+            
+            def mkdir(self, *args, **kwargs):
+                self._check_access()
+                return super().mkdir(*args, **kwargs)
+            
+            def rmdir(self, *args, **kwargs):
+                self._check_access()
+                return super().rmdir(*args, **kwargs)
+            
+            def unlink(self, *args, **kwargs):
+                self._check_access()
+                return super().unlink(*args, **kwargs)
+            
+            def rename(self, target):
+                self._check_access()
+                if not _is_path_allowed(str(target)):
+                    raise PermissionError(f"Access denied: {target} is outside allowed directories")
+                return super().rename(target)
+            
+            def replace(self, target):
+                self._check_access()
+                if not _is_path_allowed(str(target)):
+                    raise PermissionError(f"Access denied: {target} is outside allowed directories")
+                return super().replace(target)
+            
+            def symlink_to(self, target):
+                # symlink_to creates a symlink at self pointing to target
+                # We only need to check that self (where symlink is created) is allowed
+                self._check_access()
+                return super().symlink_to(target)
+            
+            def link_to(self, target):
+                # link_to creates a hard link at target pointing to self
+                # Hard links require both paths to be accessible and on the same filesystem
+                self._check_access()
+                if not _is_path_allowed(str(target)):
+                    raise PermissionError(f"Access denied: {target} is outside allowed directories")
+                return super().link_to(target)
+            
+            def chmod(self, mode):
+                self._check_access()
+                return super().chmod(mode)
+        
+        # Replace pathlib.Path in sys.modules
+        pathlib.Path = _SafePath
+        import sys
+        sys.modules['pathlib'].Path = _SafePath
+    except (ImportError, TypeError) as e:
+        # pathlib not available or subclassing failed
+        pass
+    
+    # Wrap tempfile to use allowed directories
+    try:
+        import tempfile as _tempfile_module
+        _original_mkstemp = _tempfile_module.mkstemp
+        _original_mkdtemp = _tempfile_module.mkdtemp
+        _original_NamedTemporaryFile = _tempfile_module.NamedTemporaryFile
+        _original_TemporaryDirectory = _tempfile_module.TemporaryDirectory
+        
+        def _safe_mkstemp(*args, **kwargs):
+            # Force tempfile to use the allowed temp directory
+            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            kwargs['dir'] = '${escapedTempDir}'
+            return _original_mkstemp(*args, **kwargs)
+        
+        def _safe_mkdtemp(*args, **kwargs):
+            # Force tempfile to use the allowed temp directory
+            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            kwargs['dir'] = '${escapedTempDir}'
+            return _original_mkdtemp(*args, **kwargs)
+        
+        def _safe_NamedTemporaryFile(*args, **kwargs):
+            # Force tempfile to use the allowed temp directory
+            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            kwargs['dir'] = '${escapedTempDir}'
+            return _original_NamedTemporaryFile(*args, **kwargs)
+        
+        def _safe_TemporaryDirectory(*args, **kwargs):
+            # Force tempfile to use the allowed temp directory
+            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            kwargs['dir'] = '${escapedTempDir}'
+            return _original_TemporaryDirectory(*args, **kwargs)
+        
+        _tempfile_module.mkstemp = _safe_mkstemp
+        _tempfile_module.mkdtemp = _safe_mkdtemp
+        _tempfile_module.NamedTemporaryFile = _safe_NamedTemporaryFile
+        _tempfile_module.TemporaryDirectory = _safe_TemporaryDirectory
+    except ImportError:
+        pass  # tempfile not available
 
-# Wrap pathlib.Path methods
-try:
-    from pathlib import Path as _OriginalPath
-    
-    class _SafePath(_OriginalPath):
-        def _check_access(self):
-            if not _is_path_allowed(str(self)):
-                raise PermissionError(f"Access denied: {self} is outside allowed directories")
-        
-        def touch(self, *args, **kwargs):
-            self._check_access()
-            return super().touch(*args, **kwargs)
-        
-        def write_text(self, *args, **kwargs):
-            self._check_access()
-            return super().write_text(*args, **kwargs)
-        
-        def write_bytes(self, *args, **kwargs):
-            self._check_access()
-            return super().write_bytes(*args, **kwargs)
-        
-        def mkdir(self, *args, **kwargs):
-            self._check_access()
-            return super().mkdir(*args, **kwargs)
-        
-        def rmdir(self, *args, **kwargs):
-            self._check_access()
-            return super().rmdir(*args, **kwargs)
-        
-        def unlink(self, *args, **kwargs):
-            self._check_access()
-            return super().unlink(*args, **kwargs)
-        
-        def rename(self, target):
-            self._check_access()
-            if not _is_path_allowed(str(target)):
-                raise PermissionError(f"Access denied: {target} is outside allowed directories")
-            return super().rename(target)
-        
-        def replace(self, target):
-            self._check_access()
-            if not _is_path_allowed(str(target)):
-                raise PermissionError(f"Access denied: {target} is outside allowed directories")
-            return super().replace(target)
-        
-        def symlink_to(self, target):
-            # symlink_to creates a symlink at self pointing to target
-            # We only need to check that self (where symlink is created) is allowed
-            self._check_access()
-            return super().symlink_to(target)
-        
-        def link_to(self, target):
-            # link_to creates a hard link at target pointing to self
-            # Hard links require both paths to be accessible and on the same filesystem
-            self._check_access()
-            if not _is_path_allowed(str(target)):
-                raise PermissionError(f"Access denied: {target} is outside allowed directories")
-            return super().link_to(target)
-        
-        def chmod(self, mode):
-            self._check_access()
-            return super().chmod(mode)
-    
-    # Replace pathlib.Path in sys.modules
-    import pathlib
-    pathlib.Path = _SafePath
-    import sys
-    sys.modules['pathlib'].Path = _SafePath
-except ImportError:
-    pass  # pathlib not available
-
-# Wrap tempfile to use allowed directories
-try:
-    import tempfile as _tempfile_module
-    _original_mkstemp = _tempfile_module.mkstemp
-    _original_mkdtemp = _tempfile_module.mkdtemp
-    _original_NamedTemporaryFile = _tempfile_module.NamedTemporaryFile
-    _original_TemporaryDirectory = _tempfile_module.TemporaryDirectory
-    
-    def _safe_mkstemp(*args, **kwargs):
-        # Force tempfile to use the allowed temp directory
-        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-        kwargs['dir'] = '${escapedTempDir}'
-        return _original_mkstemp(*args, **kwargs)
-    
-    def _safe_mkdtemp(*args, **kwargs):
-        # Force tempfile to use the allowed temp directory
-        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-        kwargs['dir'] = '${escapedTempDir}'
-        return _original_mkdtemp(*args, **kwargs)
-    
-    def _safe_NamedTemporaryFile(*args, **kwargs):
-        # Force tempfile to use the allowed temp directory
-        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-        kwargs['dir'] = '${escapedTempDir}'
-        return _original_NamedTemporaryFile(*args, **kwargs)
-    
-    def _safe_TemporaryDirectory(*args, **kwargs):
-        # Force tempfile to use the allowed temp directory
-        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-        kwargs['dir'] = '${escapedTempDir}'
-        return _original_TemporaryDirectory(*args, **kwargs)
-    
-    _tempfile_module.mkstemp = _safe_mkstemp
-    _tempfile_module.mkdtemp = _safe_mkdtemp
-    _tempfile_module.NamedTemporaryFile = _safe_NamedTemporaryFile
-    _tempfile_module.TemporaryDirectory = _safe_TemporaryDirectory
-except ImportError:
-    pass  # tempfile not available
+# Run sandbox setup and then delete it to hide internals from user code
+_setup_sandbox()
+del _setup_sandbox
 
 # Set working directory to target directory
 os.chdir('${escapedTargetDir}')
@@ -484,6 +502,19 @@ async function installPythonPackages(
       }],
       isError: true
     };
+  }
+
+  // Validate package names to prevent argument injection
+  for (const pkg of packages) {
+    if (pkg.startsWith('-')) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: Invalid package name '${pkg}'. Package names cannot start with '-' to prevent argument injection.`
+        }],
+        isError: true
+      };
+    }
   }
 
   return new Promise((resolve) => {

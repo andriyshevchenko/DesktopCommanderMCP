@@ -6,6 +6,9 @@ import fs from 'fs/promises';
 async function testExecutePythonCode() {
   console.log("=== Testing execute_python_code tool ===\n");
 
+  let failedTests = 0;
+  const totalTests = 6;
+
   // Test 1: Simple code execution
   console.log("Test 1: Simple Python code execution");
   try {
@@ -16,6 +19,7 @@ async function testExecutePythonCode() {
     console.log("✓ Test 1 passed\n");
   } catch (error) {
     console.error("✗ Test 1 failed:", error);
+    failedTests++;
   }
 
   // Test 2: File operations in target directory
@@ -46,12 +50,14 @@ with open('test.txt', 'r') as f:
       console.log("✓ Test 2 passed - File created successfully\n");
     } else {
       console.log("✗ Test 2 failed - File was not created\n");
+      failedTests++;
     }
     
     // Cleanup
     await fs.rm(testDir, { recursive: true, force: true });
   } catch (error) {
     console.error("✗ Test 2 failed:", error);
+    failedTests++;
   }
 
   // Test 3: Filesystem restriction - attempt to access denied directory
@@ -60,8 +66,10 @@ with open('test.txt', 'r') as f:
     const testDir = path.join(os.tmpdir(), `test-python-restricted-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
     
-    // Use a path that's clearly outside allowed directories (platform-specific)
-    const unauthorizedPath = os.platform() === 'win32' ? 'C:\\Windows\\unauthorized.txt' : '/etc/unauthorized.txt';
+    // Create a separate unauthorized directory that's writable but outside allowed directories
+    const unauthorizedDir = path.join(os.tmpdir(), `test-python-unauthorized-${Date.now()}`);
+    await fs.mkdir(unauthorizedDir, { recursive: true });
+    const unauthorizedPath = path.join(unauthorizedDir, 'unauthorized.txt');
     // Escape backslashes for Windows paths in Python string literals
     const escapedUnauthorizedPath = unauthorizedPath.replace(/\\/g, '\\\\');
     
@@ -86,15 +94,19 @@ except PermissionError as e:
         console.log("✓ Test 3 passed - Access correctly restricted\n");
       } else {
         console.log("✗ Test 3 failed - Unauthorized access was not blocked\n");
+        failedTests++;
       }
     } else {
       console.log("✗ Test 3 failed - Unexpected result structure\n");
+      failedTests++;
     }
     
     // Cleanup
     await fs.rm(testDir, { recursive: true, force: true });
+    await fs.rm(unauthorizedDir, { recursive: true, force: true });
   } catch (error) {
     console.error("✗ Test 3 failed:", error);
+    failedTests++;
   }
 
   // Test 4: Package installation (if pip is available)
@@ -120,13 +132,16 @@ except ImportError as e:
         console.log("✓ Test 4 passed - Package installation successful\n");
       } else {
         console.log("✗ Test 4 failed - Package not properly installed or imported\n");
+        failedTests++;
       }
     } else {
       console.log("✗ Test 4 failed - Unexpected result structure\n");
+      failedTests++;
     }
   } catch (error) {
     console.error("Note: Test 4 may fail if pip is not available or internet is not accessible");
     console.error("Error:", error);
+    failedTests++;
   }
 
   // Test 5: Timeout test
@@ -149,12 +164,15 @@ print('Should not reach here')
         console.log("✓ Test 5 passed - Timeout properly enforced\n");
       } else {
         console.log("✗ Test 5 failed - Timeout not properly handled\n");
+        failedTests++;
       }
     } else {
       console.log("✗ Test 5 failed - Unexpected result structure\n");
+      failedTests++;
     }
   } catch (error) {
     console.error("✗ Test 5 failed:", error);
+    failedTests++;
   }
 
   // Test 6: Error handling
@@ -172,12 +190,20 @@ print('After error - should not print')
       console.log("✓ Test 6 passed - Error properly caught and reported\n");
     } else {
       console.log("✗ Test 6 failed - Error not properly detected\n");
+      failedTests++;
     }
   } catch (error) {
     console.error("✗ Test 6 failed:", error);
+    failedTests++;
   }
 
   console.log("=== All tests completed ===");
+  console.log(`Passed: ${totalTests - failedTests}/${totalTests}`);
+  console.log(`Failed: ${failedTests}/${totalTests}`);
+  
+  if (failedTests > 0) {
+    process.exitCode = 1;
+  }
 }
 
 testExecutePythonCode().catch(console.error);
