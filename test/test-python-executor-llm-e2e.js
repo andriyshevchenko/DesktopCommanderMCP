@@ -10,6 +10,13 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
+
+// Get directory paths
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '..');
+const distPath = path.join(projectRoot, 'dist', 'index.js');
 
 // Test utilities
 const colors = {
@@ -71,7 +78,7 @@ async function createMcpClient() {
 
   const transport = new StdioClientTransport({
     command: "node",
-    args: ["../dist/index.js"]
+    args: [distPath]
   });
 
   await client.connect(transport);
