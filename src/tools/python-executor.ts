@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { ExecutePythonCodeArgsSchema } from './schemas.js';
+import { ExecutePythonCodeArgsSchema, PACKAGE_NAME_REGEX } from './schemas.js';
 import { ServerResult } from '../types.js';
 
 /**
@@ -488,8 +488,12 @@ del _setup_sandbox
 os.chdir('${escapedTargetDir}')
 
 # Execute user code
+import base64 as _py_executor_base64
+
 try:
-${userCode.split('\n').map(line => '    ' + line).join('\n')}
+    _user_code_bytes = _py_executor_base64.b64decode('${Buffer.from(userCode, 'utf8').toString('base64')}')
+    _user_code = _user_code_bytes.decode('utf-8')
+    exec(_user_code, globals(), globals())
 except Exception as e:
     import traceback
     print(f"Error executing code: {e}", file=sys.stderr)
@@ -559,13 +563,27 @@ async function installPythonPackages(
     };
   }
 
-  // Validate package names to prevent argument injection
+  // Validate package names to prevent argument injection and ensure validity
+  // Note: Schema validation already checks most of these, but we add runtime checks for defense in depth
   for (const pkg of packages) {
+    // Check for packages starting with '-' to prevent argument injection
     if (pkg.startsWith('-')) {
       return {
         content: [{
           type: "text",
           text: `Error: Invalid package name '${pkg}'. Package names cannot start with '-' to prevent argument injection.`
+        }],
+        isError: true
+      };
+    }
+    
+    // Check for invalid characters (aligned with schema validation)
+    // This provides defense in depth against shell injection even though spawn() with array args mitigates it
+    if (!PACKAGE_NAME_REGEX.test(pkg)) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', and version specifiers ([, ], =, <, >, ,, !).`
         }],
         isError: true
       };
