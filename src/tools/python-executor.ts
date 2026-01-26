@@ -75,7 +75,12 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     // Ensure cleanup on error
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
-    } catch {}
+    } catch (cleanupError) {
+      console.error('Failed to clean up temporary Python execution directory:', {
+        tempDir,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
 
     return {
       content: [{
@@ -98,7 +103,6 @@ function generatePythonWrapper(userCode: string, targetDir: string, tempDir: str
   return `
 import sys
 import os
-from pathlib import Path
 
 # Define allowed directories
 ALLOWED_DIRS = [
@@ -106,7 +110,7 @@ ALLOWED_DIRS = [
     '${escapedTempDir}',
 ]
 
-# Store original open function
+# Store original functions
 _original_open = open
 _original_listdir = os.listdir
 _original_mkdir = os.mkdir
@@ -116,26 +120,41 @@ _original_rmdir = os.rmdir
 _original_unlink = os.unlink
 
 def _is_path_allowed(filepath):
-    """Check if a file path is within allowed directories"""
+    """Check if a file path is within allowed directories
+    
+    Uses realpath to resolve symbolic links and prevent path traversal attacks.
+    Performs case-insensitive comparison on Windows.
+    """
     try:
-        abs_path = os.path.abspath(filepath)
+        # Use realpath to resolve symlinks and normalize path
+        real_path = os.path.realpath(os.path.expanduser(filepath))
+        
+        # On Windows, make comparison case-insensitive
+        if sys.platform == 'win32':
+            real_path = real_path.lower()
+            
         for allowed_dir in ALLOWED_DIRS:
-            if abs_path.startswith(os.path.abspath(allowed_dir)):
+            allowed_real = os.path.realpath(os.path.expanduser(allowed_dir))
+            if sys.platform == 'win32':
+                allowed_real = allowed_real.lower()
+                
+            # Ensure the path actually starts with the allowed directory
+            # Add separator to prevent partial matches (e.g., /tmp/x not matching /tmp/xyz)
+            if real_path == allowed_real or real_path.startswith(allowed_real + os.sep):
                 return True
         return False
     except:
         return False
 
 def _safe_open(file, mode='r', *args, **kwargs):
-    """Wrapped open function that checks path access"""
+    """Wrapped open function that checks path access for both read and write"""
     # Allow reading from standard streams
     if file in (0, 1, 2) or hasattr(file, 'read'):
         return _original_open(file, mode, *args, **kwargs)
     
-    # For write/append modes, check if path is allowed
-    if any(m in mode for m in ['w', 'a', 'x', '+']):
-        if not _is_path_allowed(file):
-            raise PermissionError(f"Access denied: {file} is outside allowed directories")
+    # Check if path is allowed for all file operations
+    if not _is_path_allowed(file):
+        raise PermissionError(f"Access denied: {file} is outside allowed directories")
     
     return _original_open(file, mode, *args, **kwargs)
 
@@ -273,6 +292,7 @@ async function installPythonPackages(
     });
 
     proc.on('error', (err) => {
+      if (timeoutId) clearTimeout(timeoutId);
       resolve({
         content: [{
           type: "text",
@@ -373,6 +393,7 @@ async function executePythonScript(
     });
 
     proc.on('error', (err) => {
+      if (timeoutId) clearTimeout(timeoutId);
       resolve({
         content: [{
           type: "text",
@@ -394,8 +415,26 @@ async function findPythonCommand(): Promise<string | null> {
     try {
       const result = await new Promise<boolean>((resolve) => {
         const proc = spawn(cmd, ['--version']);
-        proc.on('close', (code) => resolve(code === 0));
-        proc.on('error', () => resolve(false));
+        
+        // Add timeout to prevent hanging
+        const timeout = setTimeout(() => {
+          proc.kill();
+          resolve(false);
+        }, 5000);
+        
+        const cleanup = () => {
+          clearTimeout(timeout);
+        };
+        
+        proc.on('close', (code) => {
+          cleanup();
+          resolve(code === 0);
+        });
+        
+        proc.on('error', () => {
+          cleanup();
+          resolve(false);
+        });
       });
       
       if (result) {

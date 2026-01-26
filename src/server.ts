@@ -998,10 +998,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         - Timeout protection for long-running scripts
                         
                         SECURITY:
-                        The code runs with restricted filesystem access:
-                        - Can only read/write within the specified target_directory (defaults to current working directory)
-                        - Can access temporary directory for session-specific files
-                        - All other filesystem operations are blocked with PermissionError
+                        The code runs with filesystem access restrictions:
+                        - Python's open() and os.* functions are wrapped to restrict access to target_directory and temp directory
+                        - Symbolic links are resolved to prevent path traversal attacks
+                        - Unauthorized access attempts raise PermissionError
+                        - LIMITATION: Advanced Python modules (subprocess, shutil, etc.) may bypass restrictions
+                        - RECOMMENDATION: Only execute trusted Python code; use Docker for complete isolation
                         
                         PARAMETERS:
                         - code: Python code to execute (required)

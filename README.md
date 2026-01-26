@@ -571,11 +571,14 @@ print(f'Top customers: {df.groupby("customer").sum().sort_values("amount", ascen
 - Use `start_process("python3 -i")` for: Interactive REPL, multi-step workflows with state, debugging, iterative development
 
 **Security Notes:**
-- Code execution is sandboxed with filesystem restrictions
-- Only the specified target_directory and temp directory are accessible
-- Attempts to access other filesystem locations will raise PermissionError
+
+⚠️ **Important**: The Python sandbox provides filesystem access restrictions but has limitations:
+- Filesystem operations via `open()` and common `os.*` functions are restricted to `target_directory` and temp directory
+- Attempts to access other locations through these functions will raise `PermissionError`
+- The sandbox resolves symbolic links to prevent path traversal attacks
+- **However**: Other Python modules (e.g., `subprocess`, `shutil`, advanced `pathlib` methods) may bypass these restrictions
 - Network operations are allowed for package installation
-- Each execution is isolated and stateless
+- **Recommendation**: Only execute trusted Python code. For complete isolation, use the Docker setup below
 
 ### Docker Support
 
