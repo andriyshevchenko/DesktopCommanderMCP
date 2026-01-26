@@ -233,7 +233,13 @@ except PermissionError as e:
     logInfo(`Output: ${output}`);
     
     if (output.includes('Access correctly blocked') || output.includes('PermissionError')) {
-      logPass('Filesystem restrictions working correctly');
+      // Also verify the file was NOT created in unauthorized directory
+      const fileWasCreated = await fs.access(unauthorizedPath).then(() => true).catch(() => false);
+      if (fileWasCreated) {
+        logFail('File was created in unauthorized directory - sandbox failed');
+        return false;
+      }
+      logPass('Filesystem restrictions working correctly and file not created');
       return true;
     } else {
       logFail('Filesystem restrictions not enforced');

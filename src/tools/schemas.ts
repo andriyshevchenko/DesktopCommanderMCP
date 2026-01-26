@@ -3,9 +3,9 @@ import { z } from "zod";
 // Python package name validation regex
 // Validates pip package names with version specifiers and extras
 // Allowed characters: letters, digits, hyphens, underscores, dots, brackets for extras,
-// comparison operators (>, <, =), and commas for multiple version constraints
+// comparison operators (>, <, =, !), and commas for multiple version constraints
 // Must not start with '-' to prevent argument injection, and disallows '..' or '--'
-export const PACKAGE_NAME_REGEX = /^(?!-)(?!.*(\.\.|--))[A-Za-z0-9_.\-\[\]>=<,]+$/;
+export const PACKAGE_NAME_REGEX = /^(?!-)(?!.*(\.\.|--))[A-Za-z0-9_.\-\[\]!\>=<,]+$/;
 
 // Config tools schemas
 export const GetConfigArgsSchema = z.object({});

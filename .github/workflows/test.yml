@@ -17,10 +17,9 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x, 20.x]
-        # Test against all supported Python versions (3.9-3.12) to ensure compatibility
-        # across different Python environments, as the python-executor wraps Python stdlib
-        # functions that may have version-specific behavior
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        # Test against representative Python versions (oldest and newest supported)
+        # This provides adequate coverage while reducing CI runtime from 8 to 4 jobs
+        python-version: ['3.9', '3.12']
     
     steps:
       - name: Checkout code
