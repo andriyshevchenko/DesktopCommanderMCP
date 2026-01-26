@@ -55,25 +55,32 @@ The `execute_python_code` tool requires Python to be installed. Testing across m
 - Tests tool registration, execution, sandboxing, package installation
 
 #### 3b. E2E LLM Integration Tests (`e2e-llm`)
-- **Only runs on manual trigger** with `run_llm_tests` input enabled
+- **Runs automatically on push/PR** if `OPENAI_API_KEY` secret is configured
+- **Can also be triggered manually** with `run_llm_tests` input
 - Tests real OpenAI GPT-4 integration
-- Requires `OPENAI_API_KEY` secret
+- Gracefully skips if `OPENAI_API_KEY` is not available
 - Node.js 20.x, Python 3.11
 - Timeout: 15 minutes
 
-**Why manual trigger for LLM tests?**  
-LLM tests make API calls to OpenAI which:
-- Incur costs (~$0.01-0.05 per run)
-- Require API key secret
-- Take longer to execute
-- Should be run judiciously
+**Behavior**:
+- **With OPENAI_API_KEY**: Tests run automatically on every push/PR
+- **Without OPENAI_API_KEY**: Tests are skipped (workflow doesn't fail)
+- **Manual trigger**: Always available via workflow_dispatch
 
-**Running LLM tests manually**:
+**Why run LLM tests on push?**  
+With the secret configured, LLM tests provide valuable validation that the tool works with real AI. The tests:
+- Verify LLM can discover and use the tool correctly
+- Test real-world AI interaction patterns
+- Cost is minimal (~$0.01-0.05 per run)
+- Can be disabled by removing the secret
+
+**Running LLM tests manually** (without configuring secret):
 1. Go to Actions tab in GitHub
 2. Select "E2E Tests" workflow
 3. Click "Run workflow"
 4. Check "Run LLM tests" option
 5. Click "Run workflow"
+6. Note: Will fail if OPENAI_API_KEY is not configured
 
 **Status Badge**:
 ```markdown
@@ -92,9 +99,15 @@ LLM tests make API calls to OpenAI which:
 
 ## Setting Up Secrets
 
-### OPENAI_API_KEY (Optional)
+### OPENAI_API_KEY (Optional, but Recommended)
 
-Required only if you want to run LLM E2E tests in CI.
+Configuring this secret enables automatic LLM E2E tests on every push/PR.
+
+**Benefits of configuring**:
+- Automatic validation that LLM can use the tool
+- Continuous testing of AI integration
+- Early detection of issues with tool discoverability
+- Minimal cost (~$0.01-0.05 per test run)
 
 **To add the secret**:
 1. Go to repository Settings

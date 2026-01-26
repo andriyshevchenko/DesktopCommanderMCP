@@ -66,8 +66,10 @@ jobs:
   e2e-llm:
     name: E2E Tests (LLM Integration)
     runs-on: ubuntu-latest
-    # Only run on manual trigger or when explicitly enabled
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_llm_tests == 'true'
+    # Run on push/PR if OPENAI_API_KEY is available, or on manual trigger
+    if: |
+      (github.event_name == 'push' || github.event_name == 'pull_request') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_llm_tests == 'true')
     
     steps:
       - name: Checkout code
@@ -93,15 +95,20 @@ jobs:
         run: npm run build
       
       - name: Check for OpenAI API key
+        id: check_key
         run: |
           if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
             echo "⚠️ OPENAI_API_KEY secret not configured"
-            echo "LLM E2E tests require OpenAI API access"
-            echo "Configure the OPENAI_API_KEY secret in repository settings"
-            exit 1
+            echo "LLM E2E tests will be skipped"
+            echo "Configure the OPENAI_API_KEY secret in repository settings to enable LLM tests"
+            echo "has_key=false" >> $GITHUB_OUTPUT
+          else
+            echo "✓ OPENAI_API_KEY is configured"
+            echo "has_key=true" >> $GITHUB_OUTPUT
           fi
       
       - name: Run LLM E2E tests
+        if: steps.check_key.outputs.has_key == 'true'
         run: node test/test-python-executor-llm-e2e.js
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -109,12 +116,17 @@ jobs:
       
       - name: Test results
         if: always()
-        run: echo "E2E LLM tests completed"
+        run: |
+          if [ "${{ steps.check_key.outputs.has_key }}" == "true" ]; then
+            echo "E2E LLM tests completed"
+          else
+            echo "E2E LLM tests skipped (no API key)"
+          fi
   
   e2e-summary:
     name: E2E Test Summary
     runs-on: ubuntu-latest
-    needs: [e2e-mcp]
+    needs: [e2e-mcp, e2e-llm]
     if: always()
     
     steps:
@@ -132,7 +144,11 @@ jobs:
           if [ "${{ needs.e2e-llm.result }}" == "success" ]; then
             echo "✅ LLM E2E tests passed"
           elif [ "${{ needs.e2e-llm.result }}" == "skipped" ]; then
-            echo "⏭️ LLM E2E tests skipped (manual trigger required)"
+            echo "⏭️ LLM E2E tests skipped (no OPENAI_API_KEY configured)"
+          elif [ "${{ needs.e2e-llm.result }}" == "failure" ]; then
+            echo "⚠️ LLM E2E tests failed"
+            # Don't fail the entire workflow if LLM tests fail
+            # They might fail due to API issues, rate limits, etc.
           else
-            echo "⚠️ LLM E2E tests status: ${{ needs.e2e-llm.result }}"
+            echo "ℹ️ LLM E2E tests status: ${{ needs.e2e-llm.result }}"
           fi
