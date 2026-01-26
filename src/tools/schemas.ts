@@ -210,3 +210,11 @@ export const GetRecentToolCallsArgsSchema = z.object({
   since: z.string().datetime().optional(),
 });
 
+// Python code execution schema
+export const ExecutePythonCodeArgsSchema = z.object({
+  code: z.string(),
+  target_directory: z.string().optional(),
+  timeout_ms: z.number().optional().default(30000),
+  install_packages: z.array(z.string()).optional(),
+});
+
