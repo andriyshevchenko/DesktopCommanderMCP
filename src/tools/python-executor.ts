@@ -493,7 +493,7 @@ import base64 as _py_executor_base64
 try:
     _user_code_bytes = _py_executor_base64.b64decode('${Buffer.from(userCode, 'utf8').toString('base64')}')
     _user_code = _user_code_bytes.decode('utf-8')
-    exec(_user_code, globals(), globals())
+    exec(_user_code, globals(), {})
 except Exception as e:
     import traceback
     print(f"Error executing code: {e}", file=sys.stderr)
