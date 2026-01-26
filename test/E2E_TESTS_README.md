@@ -39,6 +39,7 @@ The LLM E2E tests verify:
 1. **Simple Calculation**: LLM uses the tool to calculate Fibonacci numbers
 2. **File Analysis**: LLM analyzes a CSV file and decides to install pandas
 3. **Error Handling**: LLM handles division by zero using try-except
+4. **Data Processing with File Write**: LLM reads CSV data, installs pandas, processes it, and writes results to a local file
 
 ## Why Two Types of E2E Tests?
 
@@ -50,7 +51,7 @@ The LLM E2E tests verify:
 
 The LLM E2E tests make API calls to OpenAI, which incur costs:
 - Each test scenario uses GPT-4 (more expensive but better at tool use)
-- Approximately 3-5 API calls per test run
-- Estimated cost: $0.01-0.05 per test run
+- Approximately 4-6 API calls per test run (4 test scenarios)
+- Estimated cost: $0.01-0.07 per test run
 
 Run these tests judiciously in CI/CD pipelines or manually when verifying LLM integration.

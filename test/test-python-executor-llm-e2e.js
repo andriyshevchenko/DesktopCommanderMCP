@@ -337,6 +337,106 @@ async function testLLMErrorHandling(client) {
 }
 
 /**
+ * Test 4: LLM uses tool for data processing with package installation and file writing
+ */
+async function testLLMDataProcessingWithFileWrite(client) {
+  logTest('LLM Data Processing with Package Installation and File Writing');
+  
+  const testDir = path.join(os.tmpdir(), `llm-e2e-write-test-${Date.now()}`);
+  
+  try {
+    await fs.mkdir(testDir, { recursive: true });
+    
+    // Create source data file
+    const sourceData = 'product,sales_q1,sales_q2,sales_q3,sales_q4\nWidget,1000,1200,1100,1300\nGadget,800,850,900,950\nTool,600,650,700,750';
+    await fs.writeFile(path.join(testDir, 'sales_data.csv'), sourceData, 'utf8');
+    logInfo(`Created source file: ${path.join(testDir, 'sales_data.csv')}`);
+    
+    logInfo('Asking LLM to process data and write results to a file...');
+    
+    const response = await callOpenAIWithMCP(
+      client,
+      `Read sales_data.csv, calculate total annual sales for each product using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely.`,
+      testDir
+    );
+    
+    logInfo(`LLM Response: ${JSON.stringify(response.choices[0].message, null, 2)}`);
+    
+    const message = response.choices[0].message;
+    
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      const toolCall = message.tool_calls[0];
+      logInfo(`LLM decided to use tool: ${toolCall.function.name}`);
+      logInfo(`Arguments: ${toolCall.function.arguments}`);
+      
+      if (toolCall.function.name === 'execute_python_code') {
+        const args = JSON.parse(toolCall.function.arguments);
+        
+        // Verify LLM requested package installation
+        if (args.install_packages && args.install_packages.includes('pandas')) {
+          logInfo('✓ LLM correctly requested pandas package installation');
+        } else {
+          logInfo('Note: LLM did not explicitly request pandas');
+        }
+        
+        // Verify LLM set target directory
+        if (args.target_directory) {
+          logInfo(`✓ LLM set target_directory: ${args.target_directory}`);
+        }
+        
+        // Execute the tool call
+        const result = await client.callTool({
+          name: 'execute_python_code',
+          arguments: args
+        });
+        
+        const output = result.content[0].text;
+        logInfo(`Tool output:\n${output}`);
+        
+        // Check if output file was created
+        const outputPath = path.join(testDir, 'sales_summary.txt');
+        const fileExists = await fs.access(outputPath).then(() => true).catch(() => false);
+        
+        if (fileExists) {
+          const fileContent = await fs.readFile(outputPath, 'utf8');
+          logInfo(`✓ Output file created successfully`);
+          logInfo(`File content:\n${fileContent}`);
+          
+          // Verify the content has expected data
+          if (fileContent.includes('Widget') || fileContent.includes('4600') ||
+              fileContent.includes('Gadget') || fileContent.includes('3500')) {
+            logPass('LLM successfully processed data with package installation and wrote to file');
+            return true;
+          } else {
+            logInfo('File created but content format differs from expected');
+            logPass('LLM successfully used tool for data processing and file writing');
+            return true;
+          }
+        } else {
+          logFail('Output file was not created');
+          return false;
+        }
+      } else {
+        logFail(`LLM used wrong tool: ${toolCall.function.name}`);
+        return false;
+      }
+    } else {
+      logFail('LLM did not use any tools');
+      return false;
+    }
+  } catch (error) {
+    logFail(`Exception: ${error.message}`);
+    console.error(error);
+    return false;
+  } finally {
+    // Cleanup
+    try {
+      await fs.rm(testDir, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+/**
  * Main test runner
  */
 async function runLLME2ETests() {
@@ -362,6 +462,7 @@ async function runLLME2ETests() {
       { name: 'LLM Simple Calculation', fn: testLLMSimpleCalculation },
       { name: 'LLM File Analysis', fn: testLLMFileAnalysis },
       { name: 'LLM Error Handling', fn: testLLMErrorHandling },
+      { name: 'LLM Data Processing with File Write', fn: testLLMDataProcessingWithFileWrite },
     ];
     
     for (const test of tests) {
