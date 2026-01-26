@@ -34,7 +34,8 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     // Resolve target directory
     let resolvedTargetDir = target_directory;
     if (!resolvedTargetDir) {
-      resolvedTargetDir = process.cwd();
+      // Default to the per-execution temporary directory to maintain sandboxing
+      resolvedTargetDir = tempDir;
     } else if (!path.isAbsolute(resolvedTargetDir)) {
       resolvedTargetDir = path.resolve(process.cwd(), resolvedTargetDir);
     }
@@ -118,14 +119,14 @@ function generatePythonWrapper(userCode: string, targetDir: string, tempDir: str
 import sys
 import os
 
-# Define allowed directories
-ALLOWED_DIRS = [
-    '${escapedTargetDir}',
-    '${escapedTempDir}',
-]
-
 # Setup sandbox in a function to hide internals from user code
 def _setup_sandbox():
+    # Define allowed directories inside closure to prevent user code mutation
+    allowed_dirs = [
+        '${escapedTargetDir}',
+        '${escapedTempDir}',
+    ]
+    
     # Store original functions in closure
     _original_open = open
     _original_listdir = os.listdir
@@ -160,7 +161,7 @@ def _setup_sandbox():
             if sys.platform == 'win32':
                 real_path = real_path.lower()
                 
-            for allowed_dir in ALLOWED_DIRS:
+            for allowed_dir in allowed_dirs:
                 allowed_real = os.path.realpath(os.path.expanduser(allowed_dir))
                 if sys.platform == 'win32':
                     allowed_real = allowed_real.lower()
@@ -179,8 +180,8 @@ def _setup_sandbox():
     
     def _safe_open(file, mode='r', *args, **kwargs):
         """Wrapped open function that checks path access for both read and write"""
-        # Allow reading from standard streams
-        if file in (0, 1, 2) or hasattr(file, 'read'):
+        # Allow reading from standard streams (file descriptors only)
+        if file in (0, 1, 2):
             return _original_open(file, mode, *args, **kwargs)
         
         # Check if path is allowed for all file operations
@@ -700,6 +701,8 @@ async function findPythonCommand(): Promise<string | null> {
       const result = await new Promise<boolean>((resolve) => {
         const proc = spawn(cmd, ['--version']);
         
+        let versionOutput = '';
+        
         // Add timeout to prevent hanging
         const timeout = setTimeout(() => {
           proc.kill();
@@ -710,10 +713,35 @@ async function findPythonCommand(): Promise<string | null> {
           clearTimeout(timeout);
         };
         
+        // Capture version output
+        proc.stdout.on('data', (data) => {
+          versionOutput += data.toString();
+        });
+        
+        proc.stderr.on('data', (data) => {
+          versionOutput += data.toString();
+        });
+        
         // Use 'close' event: ensures process has fully terminated and all stdio is closed
         proc.on('close', (code) => {
           cleanup();
-          resolve(code === 0);
+          
+          if (code !== 0) {
+            resolve(false);
+            return;
+          }
+          
+          // Parse version output to ensure it's Python 3
+          // Example output: "Python 3.11.0" or "Python 3.9.7"
+          const versionMatch = versionOutput.match(/Python\s+(\d+)\.(\d+)/i);
+          if (versionMatch) {
+            const majorVersion = parseInt(versionMatch[1], 10);
+            // Require Python 3 or higher
+            resolve(majorVersion >= 3);
+          } else {
+            // If we can't parse version, reject to be safe
+            resolve(false);
+          }
         });
         
         proc.on('error', () => {
