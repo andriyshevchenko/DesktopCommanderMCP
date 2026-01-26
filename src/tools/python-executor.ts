@@ -733,7 +733,7 @@ async function findPythonCommand(): Promise<string | null> {
           
           // Parse version output to ensure it's Python 3
           // Example output: "Python 3.11.0" or "Python 3.9.7"
-          const versionMatch = versionOutput.match(/Python\s+(\d+)\.(\d+)/i);
+          const versionMatch = versionOutput.match(/^Python\s+(\d+)\.(\d+)/im);
           if (versionMatch) {
             const majorVersion = parseInt(versionMatch[1], 10);
             // Require Python 3 or higher

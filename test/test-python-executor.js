@@ -112,8 +112,9 @@ except PermissionError as e:
   // Test 4: Package installation (if pip is available)
   console.log("Test 4: Package installation test");
   
-  // Check if network tests should be run
-  const runNetworkTests = process.env.RUN_NETWORK_TESTS === '1' || process.env.RUN_NETWORK_TESTS === 'true';
+  // Check if network tests should be run - accept common truthy values
+  const networkTestsEnv = (process.env.RUN_NETWORK_TESTS || '').toLowerCase();
+  const runNetworkTests = ['1', 'true', 'yes', 'on'].includes(networkTestsEnv);
   
   if (!runNetworkTests) {
     console.log("⊘ Test 4 skipped - Set RUN_NETWORK_TESTS=1 to enable network-dependent tests\n");

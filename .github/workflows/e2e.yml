@@ -114,19 +114,6 @@ jobs:
         if: steps.check_key.outputs.has_key == 'true'
         run: npm run build
       
-      - name: Check for OpenAI API key
-        id: check_key
-        run: |
-          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
-            echo "⚠️ OPENAI_API_KEY secret not configured"
-            echo "LLM E2E tests will be skipped"
-            echo "Configure the OPENAI_API_KEY secret in repository settings to enable LLM tests"
-            echo "has_key=false" >> $GITHUB_OUTPUT
-          else
-            echo "✓ OPENAI_API_KEY is configured"
-            echo "has_key=true" >> $GITHUB_OUTPUT
-          fi
-      
       - name: Run LLM E2E tests
         if: steps.check_key.outputs.has_key == 'true'
         run: node test/test-python-executor-llm-e2e.js
