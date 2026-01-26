@@ -104,8 +104,17 @@ async function runTestModules() {
     const files = await fs.readdir(__dirname);
     
     // Get all test files, starting with 'test' and ending with '.js'
+    // Exclude run-all-tests.js and e2e tests
+    // Note: E2E tests are intentionally excluded here and run in separate GitHub Actions workflows
+    // (e2e.yml) to ensure proper environment setup and isolation. E2E tests require MCP protocol
+    // server setup and Python environment configuration.
     const discoveredTests = files
-      .filter(file => file.startsWith('test') && file.endsWith('.js') && file !== 'run-all-tests.js')
+      .filter(file => 
+        file.startsWith('test') && 
+        file.endsWith('.js') && 
+        file !== 'run-all-tests.js' &&
+        !file.includes('-e2e.js') // Exclude e2e tests - run in separate workflow
+      )
       .sort(); // Sort for consistent order
     
     // Ensure main test.js runs first if it exists
