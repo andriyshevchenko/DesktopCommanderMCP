@@ -610,6 +610,7 @@ async function installPythonPackages(
 
     proc.on('error', (err) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
       resolve({
         content: [{
           type: "text",
@@ -737,6 +738,7 @@ async function executePythonScript(
 
     proc.on('error', (err) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
       resolve({
         content: [{
           type: "text",
