@@ -525,9 +525,16 @@ function buildMinimalEnvironment(): Record<string, string> {
       SYSTEMROOT: process.env.SYSTEMROOT || '',
       WINDIR: process.env.WINDIR || '',
       USERNAME: process.env.USERNAME || '',
+      // Python/pip often rely on these directories on Windows
+      USERPROFILE: process.env.USERPROFILE || '',
+      APPDATA: process.env.APPDATA || '',
+      LOCALAPPDATA: process.env.LOCALAPPDATA || '',
     } : {
       USER: process.env.USER || '',
       LOGNAME: process.env.LOGNAME || '',
+      // Common locale settings that Python may need
+      LANG: process.env.LANG || '',
+      LC_ALL: process.env.LC_ALL || '',
     }),
   };
 }

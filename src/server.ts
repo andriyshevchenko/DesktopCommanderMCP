@@ -993,16 +993,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         FEATURES:
                         - Automatic package installation with pip (internet access required)
-                        - Filesystem access restricted to target directory and temp directory
+                        - Filesystem access restrictions (best-effort) to target directory and temp directory
                         - Packages installed to separate session-specific directory
                         - Timeout protection for long-running scripts
                         
                         SECURITY:
-                        The code runs with filesystem access restrictions:
+                        The code runs with best-effort filesystem access restrictions:
                         - Python's open() and some os.* functions (e.g., listdir, mkdir, remove, rename, chmod) are wrapped to restrict access to target_directory and temp directory
                         - Symbolic links are resolved to prevent path traversal attacks
                         - Unauthorized access attempts raise PermissionError
-                        - LIMITATION: Advanced Python modules (subprocess, etc.) may bypass restrictions
+                        - LIMITATION: Low-level file APIs (os.open, os.stat, etc.) and advanced modules (subprocess, etc.) are NOT wrapped and can bypass restrictions
                         - RECOMMENDATION: Only execute trusted Python code; use Docker for complete isolation
                         
                         PARAMETERS:

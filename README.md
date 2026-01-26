@@ -450,7 +450,7 @@ The server provides a comprehensive set of tools organized into several categori
 | | `list_sessions` | List all active terminal sessions |
 | | `list_processes` | List all running processes with detailed information |
 | | `kill_process` | Terminate a running process by PID |
-| **Code Execution** | `execute_python_code` | Execute Python code in a sandboxed environment with automatic package installation and filesystem restrictions. Perfect for quick scripts and data analysis without interactive REPL. |
+| **Code Execution** | `execute_python_code` | Execute Python code in a sandboxed environment with automatic package installation and best-effort filesystem restrictions. Perfect for quick scripts and data analysis without interactive REPL. |
 | **Filesystem** | `read_file` | Read contents from local filesystem, URLs, Excel files (.xlsx, .xls, .xlsm), and PDFs with line/page-based pagination |
 | | `read_multiple_files` | Read multiple files simultaneously |
 | | `write_file` | Write file contents with options for rewrite or append mode. Supports Excel files (JSON 2D array format). For PDFs, use `write_pdf` |
@@ -526,11 +526,11 @@ When a search fails, you'll see detailed information about the closest match fou
 
 ### Sandboxed Python Code Execution
 
-The `execute_python_code` tool provides a secure way to execute Python code with automatic package management and filesystem restrictions:
+The `execute_python_code` tool provides a secure way to execute Python code with automatic package management and best-effort filesystem restrictions:
 
 **Features:**
 - Automatic package installation with pip (internet access required)
-- Filesystem access restricted to target directory and temp directory only
+- Best-effort filesystem access restrictions to target directory and temp directory
 - Packages installed to separate session-specific directory
 - Timeout protection for long-running scripts
 - Clean error handling and reporting
@@ -574,7 +574,7 @@ print(f'Top customers: {df.groupby("customer").sum().sort_values("amount", ascen
 
 ⚠️ **Important**: The Python sandbox is a convenience feature, **not** a security boundary:
 - It is designed to encourage working within the specified `target_directory` and temp directory, but it does **not** comprehensively restrict all filesystem access
-- The sandbox attempts to gate common operations like `open()` and some `os.*` functions, but the underlying Python runtime (including original built-in functions and operations like `os.rename`/`os.symlink`) may still be reachable from user code
+- The sandbox wraps common high-level operations like `open()` and some `os.*` functions (e.g., `listdir`, `mkdir`, `remove`, `rename`, `chmod`), but **low-level file APIs** like `os.open`, `os.stat`, and file-descriptor operations are **not wrapped** and can bypass restrictions
 - Other Python modules (e.g., `subprocess`, `shutil`, advanced `pathlib` methods) can bypass any best-effort checks
 - The sandbox resolves symbolic links to prevent basic path traversal attacks
 - Network operations are allowed for package installation
