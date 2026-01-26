@@ -235,9 +235,11 @@ def _safe_replace(src, dst):
     return _original_replace(src, dst)
 
 def _safe_symlink(src, dst):
-    """Wrapped symlink that checks destination path"""
-    # Note: We check the destination path where the symlink is created,
-    # not the source path it points to
+    """Wrapped symlink that checks destination path.
+    
+    os.symlink(src, dst) creates a symlink at dst pointing to src.
+    We only check dst (where the symlink is created) is within allowed directories.
+    """
     if not _is_path_allowed(dst):
         raise PermissionError(f"Access denied: {dst} is outside allowed directories")
     return _original_symlink(src, dst)
@@ -383,10 +385,9 @@ try:
             return super().replace(target)
         
         def symlink_to(self, target):
+            # symlink_to creates a symlink at self pointing to target
+            # We only need to check that self (where symlink is created) is allowed
             self._check_access()
-            # Also check that target is within allowed directories
-            if not _is_path_allowed(str(target)):
-                raise PermissionError(f"Access denied: {target} is outside allowed directories")
             return super().symlink_to(target)
         
         def link_to(self, target):
