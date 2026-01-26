@@ -99,7 +99,15 @@ except PermissionError as e:
     if (result.content && result.content[0] && result.content[0].text) {
       const output = result.content[0].text;
       if (output.includes('Correctly blocked') || output.includes('PermissionError')) {
-        console.log("✓ Test 3 passed - Access correctly restricted\n");
+        // Also verify the file was NOT created in the unauthorized directory
+        try {
+          await fs.access(unauthorizedPath3);
+          console.log("✗ Test 3 failed - File was created in unauthorized directory despite error\n");
+          failedTests++;
+        } catch {
+          // File doesn't exist - this is correct
+          console.log("✓ Test 3 passed - Access correctly restricted and file not created\n");
+        }
       } else {
         console.log("✗ Test 3 failed - Unauthorized access was not blocked\n");
         failedTests++;

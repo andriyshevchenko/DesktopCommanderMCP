@@ -50,12 +50,14 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     try {
       const stats = await fs.stat(resolvedTargetDir);
       if (!stats.isDirectory()) {
+        await fs.rm(tempDir, { recursive: true, force: true });
         return {
           content: [{ type: "text", text: `Error: Target path is not a directory: ${resolvedTargetDir}` }],
           isError: true,
         };
       }
     } catch {
+      await fs.rm(tempDir, { recursive: true, force: true });
       return {
         content: [{ type: "text", text: `Error: Target directory does not exist: ${resolvedTargetDir}` }],
         isError: true,
@@ -79,8 +81,15 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     // Execute the script
     const result = await executePythonScript(scriptPath, packagesDir, timeout_ms);
 
-    // Clean up
-    await fs.rm(tempDir, { recursive: true, force: true });
+    // Clean up - don't let cleanup errors prevent returning successful result
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (cleanupError) {
+      console.error('Failed to clean up temporary Python execution directory:', {
+        tempDir,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
 
     return result;
 
@@ -446,31 +455,39 @@ def _setup_sandbox():
         _original_TemporaryDirectory = _tempfile_module.TemporaryDirectory
         
         def _safe_mkstemp(*args, **kwargs):
-            # Force tempfile to use the allowed temp directory
-            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-            kwargs['dir'] = '${escapedTempDir}'
+            # Validate user-provided dir; default to allowed temp directory if none provided
+            if 'dir' in kwargs:
+                if not _is_path_allowed(kwargs['dir']):
+                    raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            else:
+                kwargs['dir'] = '${escapedTempDir}'
             return _original_mkstemp(*args, **kwargs)
         
         def _safe_mkdtemp(*args, **kwargs):
-            # Force tempfile to use the allowed temp directory
-            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-            kwargs['dir'] = '${escapedTempDir}'
+            # Validate user-provided dir; default to allowed temp directory if none provided
+            if 'dir' in kwargs:
+                if not _is_path_allowed(kwargs['dir']):
+                    raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            else:
+                kwargs['dir'] = '${escapedTempDir}'
             return _original_mkdtemp(*args, **kwargs)
         
         def _safe_NamedTemporaryFile(*args, **kwargs):
-            # Force tempfile to use the allowed temp directory
-            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-            kwargs['dir'] = '${escapedTempDir}'
+            # Validate user-provided dir; default to allowed temp directory if none provided
+            if 'dir' in kwargs:
+                if not _is_path_allowed(kwargs['dir']):
+                    raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            else:
+                kwargs['dir'] = '${escapedTempDir}'
             return _original_NamedTemporaryFile(*args, **kwargs)
         
         def _safe_TemporaryDirectory(*args, **kwargs):
-            # Force tempfile to use the allowed temp directory
-            if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
-                raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
-            kwargs['dir'] = '${escapedTempDir}'
+            # Validate user-provided dir; default to allowed temp directory if none provided
+            if 'dir' in kwargs:
+                if not _is_path_allowed(kwargs['dir']):
+                    raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+            else:
+                kwargs['dir'] = '${escapedTempDir}'
             return _original_TemporaryDirectory(*args, **kwargs)
         
         _tempfile_module.mkstemp = _safe_mkstemp
@@ -487,13 +504,25 @@ del _setup_sandbox
 # Set working directory to target directory
 os.chdir('${escapedTargetDir}')
 
-# Execute user code
+# Execute user code with isolated namespace
 import base64 as _py_executor_base64
 
 try:
     _user_code_bytes = _py_executor_base64.b64decode('${Buffer.from(userCode, 'utf8').toString('base64')}')
     _user_code = _user_code_bytes.decode('utf-8')
-    exec(_user_code, globals(), {})
+    
+    # Build a restricted globals dictionary for user code execution
+    # This isolates user code from internal wrapper variables and provides a clean namespace
+    # Note: The sandboxed open, os functions, etc. are already in builtins and os module
+    # after _setup_sandbox() ran, so we just need to provide a minimal clean namespace
+    _exec_globals = {
+        '__builtins__': __builtins__,
+        'os': os,
+        'sys': sys,
+    }
+    _exec_locals = {}
+    
+    exec(_user_code, _exec_globals, _exec_locals)
 except Exception as e:
     import traceback
     print(f"Error executing code: {e}", file=sys.stderr)
@@ -516,10 +545,12 @@ except Exception as e:
  * - Platform-specific (Windows): SYSTEMROOT, WINDIR, USERNAME, USERPROFILE, APPDATA, LOCALAPPDATA
  * - Platform-specific (Unix): USER, LOGNAME, LANG, LC_ALL
  * 
+ * Empty variables are filtered out to avoid confusion in Python code.
+ * 
  * @returns A minimal environment object safe for use with Python subprocesses
  */
 function buildMinimalEnvironment(): Record<string, string> {
-  return {
+  const env: Record<string, string> = {
     PATH: process.env.PATH || '',
     HOME: process.env.HOME || '',
     TMPDIR: process.env.TMPDIR || '',
@@ -542,6 +573,11 @@ function buildMinimalEnvironment(): Record<string, string> {
       LC_ALL: process.env.LC_ALL || '',
     }),
   };
+
+  // Remove variables that are missing in the parent environment (value === '')
+  return Object.fromEntries(
+    Object.entries(env).filter(([, value]) => value !== '')
+  );
 }
 
 /**
@@ -583,7 +619,7 @@ async function installPythonPackages(
       return {
         content: [{
           type: "text",
-          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', and version specifiers ([, ], =, <, >, ,, !).`
+          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', and version specifiers ([, ], !, =, <, >, ,).`
         }],
         isError: true
       };
