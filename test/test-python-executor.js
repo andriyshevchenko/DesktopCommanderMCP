@@ -60,11 +60,14 @@ with open('test.txt', 'r') as f:
     const testDir = path.join(os.tmpdir(), `test-python-restricted-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
     
+    // Use a path that's clearly outside allowed directories (platform-specific)
+    const unauthorizedPath = os.platform() === 'win32' ? 'C:\\Windows\\unauthorized.txt' : '/etc/unauthorized.txt';
+    
     const result = await executePythonCode({
       code: `
 try:
-    # Try to write to root or home directory (should be blocked)
-    with open('/tmp/unauthorized.txt', 'w') as f:
+    # Try to write to unauthorized location (should be blocked)
+    with open('${unauthorizedPath}', 'w') as f:
         f.write('This should not work')
     print('ERROR: Was able to write to unauthorized location!')
 except PermissionError as e:

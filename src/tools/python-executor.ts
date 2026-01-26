@@ -220,12 +220,20 @@ async function installPythonPackages(
 
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
-    const proc = spawn(pythonCmd, args, {
-      timeout: timeout_ms
-    });
+    const proc = spawn(pythonCmd, args);
 
     let stdout = '';
     let stderr = '';
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isTimedOut = false;
+
+    // Set up timeout
+    if (timeout_ms > 0) {
+      timeoutId = setTimeout(() => {
+        isTimedOut = true;
+        proc.kill('SIGTERM');
+      }, timeout_ms);
+    }
 
     proc.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -236,7 +244,17 @@ async function installPythonPackages(
     });
 
     proc.on('close', (exitCode) => {
-      if (exitCode !== 0) {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (isTimedOut) {
+        resolve({
+          content: [{
+            type: "text",
+            text: `Failed to install packages: ${packages.join(', ')} - Timeout after ${timeout_ms}ms`
+          }],
+          isError: true
+        });
+      } else if (exitCode !== 0) {
         resolve({
           content: [{
             type: "text",
@@ -296,12 +314,21 @@ async function executePythonScript(
     }
 
     const proc = spawn(pythonCmd, [scriptPath], {
-      env,
-      timeout: timeout_ms
+      env
     });
 
     let stdout = '';
     let stderr = '';
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isTimedOut = false;
+
+    // Set up timeout
+    if (timeout_ms > 0) {
+      timeoutId = setTimeout(() => {
+        isTimedOut = true;
+        proc.kill('SIGTERM');
+      }, timeout_ms);
+    }
 
     proc.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -312,7 +339,17 @@ async function executePythonScript(
     });
 
     proc.on('close', (exitCode) => {
-      if (exitCode !== 0) {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (isTimedOut) {
+        resolve({
+          content: [{
+            type: "text",
+            text: `Execution timed out after ${timeout_ms}ms\n\nPartial output:\n${stdout}\n${stderr}`
+          }],
+          isError: true
+        });
+      } else if (exitCode !== 0) {
         resolve({
           content: [{
             type: "text",
