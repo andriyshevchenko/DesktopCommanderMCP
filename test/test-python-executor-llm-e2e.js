@@ -170,8 +170,15 @@ async function testLLMSimpleCalculation(client) {
       logInfo(`Arguments: ${toolCall.function.arguments}`);
       
       if (toolCall.function.name === 'execute_python_code') {
-        // Execute the tool call through MCP
-        const args = JSON.parse(toolCall.function.arguments);
+        let args;
+        try {
+          // Execute the tool call through MCP
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (parseError) {
+          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          return false;
+        }
+        
         const result = await client.callTool({
           name: 'execute_python_code',
           arguments: args
@@ -233,10 +240,18 @@ async function testLLMFileAnalysis(client) {
     if (message.tool_calls && message.tool_calls.length > 0) {
       const toolCall = message.tool_calls[0];
       logInfo(`LLM decided to use tool: ${toolCall.function.name}`);
-      logInfo(`Arguments: ${toolCall.function.arguments}`);
+      logInfo(`Arguments (raw): ${toolCall.function.arguments}`);
       
       if (toolCall.function.name === 'execute_python_code') {
-        const args = JSON.parse(toolCall.function.arguments);
+        let args;
+        try {
+          // Parse the arguments - handle potential escaping issues from OpenAI
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (parseError) {
+          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
+          return false;
+        }
         
         // Check if LLM requested pandas
         if (args.install_packages && args.install_packages.includes('pandas')) {
@@ -304,7 +319,14 @@ async function testLLMErrorHandling(client) {
       const toolCall = message.tool_calls[0];
       
       if (toolCall.function.name === 'execute_python_code') {
-        const args = JSON.parse(toolCall.function.arguments);
+        let args;
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (parseError) {
+          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          return false;
+        }
+        
         logInfo(`LLM's code:\n${args.code}`);
         
         const result = await client.callTool({
@@ -370,7 +392,14 @@ async function testLLMDataProcessingWithFileWrite(client) {
       logInfo(`Arguments: ${toolCall.function.arguments}`);
       
       if (toolCall.function.name === 'execute_python_code') {
-        const args = JSON.parse(toolCall.function.arguments);
+        let args;
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (parseError) {
+          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
+          return false;
+        }
         
         // Verify LLM requested package installation
         if (args.install_packages && args.install_packages.includes('pandas')) {
