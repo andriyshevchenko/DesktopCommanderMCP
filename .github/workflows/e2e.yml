@@ -66,6 +66,8 @@ jobs:
   e2e-llm:
     name: E2E Tests (LLM Integration)
     runs-on: ubuntu-latest
+    outputs:
+      tests_ran: ${{ steps.check_key.outputs.has_key }}
     # Note: GitHub Actions does not allow checking secrets in job-level conditions.
     # This job always runs on push/PR, and on manual workflow_dispatch it runs only
     # when 'run_llm_tests' is set to true. The "Check for OpenAI API key" step
@@ -149,10 +151,11 @@ jobs:
       - name: LLM tests status
         run: |
           RESULT="${{ needs.e2e-llm.result }}"
-          if [ "$RESULT" == "success" ]; then
+          TESTS_RAN="${{ needs.e2e-llm.outputs.tests_ran }}"
+          if [ "$TESTS_RAN" == "true" ] && [ "$RESULT" == "success" ]; then
             echo "✅ LLM E2E tests passed"
-          elif [ "$RESULT" == "skipped" ] || [ -z "$RESULT" ]; then
-            echo "⏭️ LLM E2E tests skipped (job not scheduled or no OPENAI_API_KEY configured)"
+          elif [ "$TESTS_RAN" != "true" ] || [ "$RESULT" == "skipped" ] || [ -z "$RESULT" ]; then
+            echo "⏭️ LLM E2E tests skipped (no OPENAI_API_KEY configured)"
           elif [ "$RESULT" == "failure" ]; then
             echo "⚠️ LLM E2E tests failed"
             # Don't fail the entire workflow if LLM tests fail

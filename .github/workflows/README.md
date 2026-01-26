@@ -52,7 +52,8 @@ The `execute_python_code` tool requires Python to be installed. Testing across m
 - Tests real MCP Client/Server communication
 - Matrix: Node.js (18.x, 20.x) × Python (3.10, 3.11, 3.12)
 - Timeout: 10 minutes
-- Tests tool registration, execution, sandboxing, package installation
+- Tests tool registration, execution, sandboxing
+- Optionally tests package installation when `RUN_NETWORK_TESTS=1` is set in the environment
 
 #### 3b. E2E LLM Integration Tests (`e2e-llm`)
 - **Runs automatically on push/PR** if `OPENAI_API_KEY` secret is configured

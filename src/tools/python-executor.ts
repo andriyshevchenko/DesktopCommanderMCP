@@ -6,6 +6,12 @@ import { ExecutePythonCodeArgsSchema } from './schemas.js';
 import { ServerResult } from '../types.js';
 
 /**
+ * Grace period in milliseconds before sending SIGKILL after SIGTERM
+ * Allows processes time to clean up gracefully before forced termination
+ */
+const KILL_GRACE_PERIOD_MS = 5000;
+
+/**
  * Execute Python code in a sandboxed environment with limited filesystem access
  * and automatic package installation
  */
@@ -493,6 +499,40 @@ except Exception as e:
 }
 
 /**
+ * Build a minimal whitelisted environment to avoid leaking secrets
+ * 
+ * This function creates a minimal set of environment variables for Python subprocesses.
+ * By using a whitelist approach, we prevent secrets (API keys, tokens, etc.) that may
+ * exist in the server's process.env from being exposed to Python code or package install scripts.
+ * 
+ * Included variables:
+ * - PATH: Required for Python and pip to find executables
+ * - HOME: Used by Python for user site-packages and config files
+ * - TMPDIR/TEMP/TMP: Required for temporary file operations
+ * - Platform-specific: SYSTEMROOT/WINDIR/USERNAME (Windows) or USER/LOGNAME (Unix)
+ * 
+ * @returns A minimal environment object safe for use with Python subprocesses
+ */
+function buildMinimalEnvironment(): Record<string, string> {
+  return {
+    PATH: process.env.PATH || '',
+    HOME: process.env.HOME || '',
+    TMPDIR: process.env.TMPDIR || '',
+    TEMP: process.env.TEMP || '',
+    TMP: process.env.TMP || '',
+    // Platform-specific essentials
+    ...(process.platform === 'win32' ? {
+      SYSTEMROOT: process.env.SYSTEMROOT || '',
+      WINDIR: process.env.WINDIR || '',
+      USERNAME: process.env.USERNAME || '',
+    } : {
+      USER: process.env.USER || '',
+      LOGNAME: process.env.LOGNAME || '',
+    }),
+  };
+}
+
+/**
  * Install Python packages using pip
  */
 async function installPythonPackages(
@@ -526,18 +566,28 @@ async function installPythonPackages(
 
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
-    const proc = spawn(pythonCmd, args);
+    const env = buildMinimalEnvironment();
+    const proc = spawn(pythonCmd, args, { env });
 
     let stdout = '';
     let stderr = '';
     let timeoutId: NodeJS.Timeout | null = null;
+    let killTimeoutId: NodeJS.Timeout | null = null;
     let isTimedOut = false;
 
-    // Set up timeout
+    // Set up timeout with two-stage termination
     if (timeout_ms > 0) {
       timeoutId = setTimeout(() => {
         isTimedOut = true;
         proc.kill('SIGTERM');
+        
+        // If process doesn't exit after SIGTERM, force kill after grace period
+        killTimeoutId = setTimeout(() => {
+          // Only send SIGKILL if process hasn't exited yet
+          if (proc.exitCode === null && proc.signalCode === null) {
+            proc.kill('SIGKILL');
+          }
+        }, KILL_GRACE_PERIOD_MS);
       }, timeout_ms);
     }
 
@@ -553,6 +603,7 @@ async function installPythonPackages(
     // ensuring we've captured all output. 'exit' can fire before stdio is fully read.
     proc.on('close', (exitCode) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
 
       if (isTimedOut) {
         resolve({
@@ -582,6 +633,7 @@ async function installPythonPackages(
 
     proc.on('error', (err) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
       resolve({
         content: [{
           type: "text",
@@ -613,23 +665,7 @@ async function executePythonScript(
   }
 
   return new Promise((resolve) => {
-    // Use minimal whitelisted environment to avoid leaking secrets
-    const env = {
-      PATH: process.env.PATH || '',
-      HOME: process.env.HOME || '',
-      TMPDIR: process.env.TMPDIR || '',
-      TEMP: process.env.TEMP || '',
-      TMP: process.env.TMP || '',
-      // Platform-specific essentials
-      ...(process.platform === 'win32' ? {
-        SYSTEMROOT: process.env.SYSTEMROOT || '',
-        WINDIR: process.env.WINDIR || '',
-        USERNAME: process.env.USERNAME || '',
-      } : {
-        USER: process.env.USER || '',
-        LOGNAME: process.env.LOGNAME || '',
-      }),
-    };
+    const env = buildMinimalEnvironment();
     
     // Add packages directory to PYTHONPATH (preserve existing if present)
     const existingPythonPath = process.env.PYTHONPATH;
@@ -644,13 +680,22 @@ async function executePythonScript(
     let stdout = '';
     let stderr = '';
     let timeoutId: NodeJS.Timeout | null = null;
+    let killTimeoutId: NodeJS.Timeout | null = null;
     let isTimedOut = false;
 
-    // Set up timeout
+    // Set up timeout with two-stage termination
     if (timeout_ms > 0) {
       timeoutId = setTimeout(() => {
         isTimedOut = true;
         proc.kill('SIGTERM');
+        
+        // If process doesn't exit after SIGTERM, force kill after grace period
+        killTimeoutId = setTimeout(() => {
+          // Only send SIGKILL if process hasn't exited yet
+          if (proc.exitCode === null && proc.signalCode === null) {
+            proc.kill('SIGKILL');
+          }
+        }, KILL_GRACE_PERIOD_MS);
       }, timeout_ms);
     }
 
@@ -666,6 +711,7 @@ async function executePythonScript(
     // ensuring we've captured all output. 'exit' can fire before stdio is fully read.
     proc.on('close', (exitCode) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
 
       if (isTimedOut) {
         resolve({
@@ -700,6 +746,7 @@ async function executePythonScript(
 
     proc.on('error', (err) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
       resolve({
         content: [{
           type: "text",
