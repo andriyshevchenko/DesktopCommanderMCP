@@ -63,7 +63,9 @@ with open('test.txt', 'r') as f:
     // Cleanup
     try {
       await fs.rm(testDir2, { recursive: true, force: true });
-    } catch {}
+    } catch {
+      // Ignore cleanup errors - temp directory may already be removed
+    }
   }
 
   // Test 3: Filesystem restriction - attempt to access denied directory
@@ -113,10 +115,14 @@ except PermissionError as e:
     // Cleanup
     try {
       await fs.rm(testDir3, { recursive: true, force: true });
-    } catch {}
+    } catch {
+      // Ignore cleanup errors - temp directory may already be removed
+    }
     try {
       await fs.rm(unauthorizedDir3, { recursive: true, force: true });
-    } catch {}
+    } catch {
+      // Ignore cleanup errors - temp directory may already be removed
+    }
   }
 
   // Test 4: Package installation (if pip is available)

@@ -631,8 +631,11 @@ async function executePythonScript(
       }),
     };
     
-    // Add packages directory to PYTHONPATH
-    env.PYTHONPATH = packagesDir;
+    // Add packages directory to PYTHONPATH (preserve existing if present)
+    const existingPythonPath = process.env.PYTHONPATH;
+    env.PYTHONPATH = existingPythonPath 
+      ? `${packagesDir}${path.delimiter}${existingPythonPath}`
+      : packagesDir;
 
     const proc = spawn(pythonCmd, [scriptPath], {
       env
