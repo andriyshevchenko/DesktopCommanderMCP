@@ -221,9 +221,9 @@ export const ExecutePythonCodeArgsSchema = z.object({
         .string()
         .trim()
         .min(1, { message: "package name must not be empty" })
-        .regex(/^(?!-)[A-Za-z0-9_.\-\[\]>=<,;:~!]+$/, {
+        .regex(/^(?!-)[A-Za-z0-9_.\-\[\]>=<,! ]+$/, {
           message:
-            "invalid package name: must not start with '-' and may only contain letters, digits, '_', '.', '-', and version specifiers",
+            "invalid package name: must not start with '-' and may only contain letters, digits, '_', '.', '-', spaces, and version specifiers ([, ], =, <, >, ,, !)",
         }),
     )
     .optional(),

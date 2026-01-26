@@ -564,18 +564,8 @@ async function installPythonPackages(
   }
 
   // Validate package names to prevent argument injection and ensure validity
+  // Note: Schema validation already checks most of these, but we add runtime checks for defense in depth
   for (const pkg of packages) {
-    // Check for empty strings
-    if (!pkg || pkg.trim().length === 0) {
-      return {
-        content: [{
-          type: "text",
-          text: `Error: Invalid package name - package names cannot be empty.`
-        }],
-        isError: true
-      };
-    }
-    
     // Check for packages starting with '-' to prevent argument injection
     if (pkg.startsWith('-')) {
       return {
@@ -587,14 +577,16 @@ async function installPythonPackages(
       };
     }
     
-    // Check for invalid characters (pip package names can only contain alphanumeric, hyphens, underscores, and dots)
+    // Check for invalid characters (aligned with schema validation)
+    // Pip package names with version specifiers can contain: letters, digits, hyphens, underscores, dots,
+    // brackets for extras, comparison operators (>, <, =, !), commas, and spaces
     // This provides defense in depth against shell injection even though spawn() with array args mitigates it
-    const validPackageNameRegex = /^[A-Za-z0-9_.\-\[\]>=<,;:~!]+$/;
+    const validPackageNameRegex = /^(?!-)[A-Za-z0-9_.\-\[\]>=<,! ]+$/;
     if (!validPackageNameRegex.test(pkg)) {
       return {
         content: [{
           type: "text",
-          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', and version specifiers like brackets and comparison operators.`
+          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', spaces, and version specifiers ([, ], =, <, >, ,, !).`
         }],
         isError: true
       };
