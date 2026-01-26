@@ -175,7 +175,7 @@ async function testLLMSimpleCalculation(client) {
           // Execute the tool call through MCP
           args = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           return false;
         }
         
@@ -248,7 +248,7 @@ async function testLLMFileAnalysis(client) {
           // Parse the arguments - handle potential escaping issues from OpenAI
           args = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
           return false;
         }
@@ -323,7 +323,7 @@ async function testLLMErrorHandling(client) {
         try {
           args = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           return false;
         }
         
@@ -396,7 +396,7 @@ async function testLLMDataProcessingWithFileWrite(client) {
         try {
           args = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          logFail(`Failed to parse tool arguments: ${parseError.message}`);
+          logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
           return false;
         }

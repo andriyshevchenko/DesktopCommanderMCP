@@ -143,7 +143,11 @@ def _is_path_allowed(filepath):
             if real_path == allowed_real or real_path.startswith(allowed_real + os.sep):
                 return True
         return False
-    except:
+    except (OSError, ValueError) as exc:
+        sys.stderr.write(f"[sandbox] _is_path_allowed error for {filepath!r}: {exc}\\n")
+        return False
+    except Exception as exc:
+        sys.stderr.write(f"[sandbox] unexpected error in _is_path_allowed for {filepath!r}: {exc}\\n")
         return False
 
 def _safe_open(file, mode='r', *args, **kwargs):
