@@ -437,11 +437,6 @@ def _setup_sandbox():
             def chmod(self, mode):
                 self._check_access()
                 return super().chmod(mode)
-            
-            def open(self, *args, **kwargs):
-                # Override Path.open() to use the wrapped _safe_open function
-                self._check_access()
-                return _safe_open(str(self), *args, **kwargs)
         
         # Replace pathlib.Path in sys.modules
         pathlib.Path = _SafePath
