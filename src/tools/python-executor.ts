@@ -420,7 +420,7 @@ def _setup_sandbox():
         pathlib.Path = _SafePath
         import sys
         sys.modules['pathlib'].Path = _SafePath
-    except (ImportError, TypeError) as e:
+    except (ImportError, TypeError):
         # pathlib not available or subclassing failed
         pass
     
