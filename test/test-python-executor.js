@@ -80,11 +80,15 @@ except PermissionError as e:
     console.log("Result:", JSON.stringify(result, null, 2));
     
     // Validate the result
-    const output = result.content[0].text;
-    if (output.includes('Correctly blocked') || output.includes('PermissionError')) {
-      console.log("✓ Test 3 passed - Access correctly restricted\n");
+    if (result.content && result.content[0] && result.content[0].text) {
+      const output = result.content[0].text;
+      if (output.includes('Correctly blocked') || output.includes('PermissionError')) {
+        console.log("✓ Test 3 passed - Access correctly restricted\n");
+      } else {
+        console.log("✗ Test 3 failed - Unauthorized access was not blocked\n");
+      }
     } else {
-      console.log("✗ Test 3 failed - Unauthorized access was not blocked\n");
+      console.log("✗ Test 3 failed - Unexpected result structure\n");
     }
     
     // Cleanup
@@ -110,11 +114,15 @@ except ImportError as e:
     console.log("Result:", JSON.stringify(result, null, 2));
     
     // Validate the result
-    const output = result.content[0].text;
-    if (!result.isError && output.includes('Package installation successful!')) {
-      console.log("✓ Test 4 passed - Package installation successful\n");
+    if (result.content && result.content[0] && result.content[0].text) {
+      const output = result.content[0].text;
+      if (!result.isError && output.includes('Package installation successful!')) {
+        console.log("✓ Test 4 passed - Package installation successful\n");
+      } else {
+        console.log("✗ Test 4 failed - Package not properly installed or imported\n");
+      }
     } else {
-      console.log("✗ Test 4 failed - Package not properly installed or imported\n");
+      console.log("✗ Test 4 failed - Unexpected result structure\n");
     }
   } catch (error) {
     console.error("Note: Test 4 may fail if pip is not available or internet is not accessible");
@@ -136,10 +144,14 @@ print('Should not reach here')
     console.log("Result:", JSON.stringify(result, null, 2));
     
     // Validate the result
-    if (result.isError && result.content[0].text.includes('timed out')) {
-      console.log("✓ Test 5 passed - Timeout properly enforced\n");
+    if (result.content && result.content[0] && result.content[0].text) {
+      if (result.isError && result.content[0].text.includes('timed out')) {
+        console.log("✓ Test 5 passed - Timeout properly enforced\n");
+      } else {
+        console.log("✗ Test 5 failed - Timeout not properly handled\n");
+      }
     } else {
-      console.log("✗ Test 5 failed - Timeout not properly handled\n");
+      console.log("✗ Test 5 failed - Unexpected result structure\n");
     }
   } catch (error) {
     console.error("✗ Test 5 failed:", error);

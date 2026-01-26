@@ -384,6 +384,9 @@ try:
         
         def symlink_to(self, target):
             self._check_access()
+            # Also check that target is within allowed directories
+            if not _is_path_allowed(str(target)):
+                raise PermissionError(f"Access denied: {target} is outside allowed directories")
             return super().symlink_to(target)
         
         def link_to(self, target):
@@ -414,24 +417,30 @@ try:
     
     def _safe_mkstemp(*args, **kwargs):
         # Force tempfile to use the allowed temp directory
+        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
         kwargs['dir'] = '${escapedTempDir}'
         return _original_mkstemp(*args, **kwargs)
     
     def _safe_mkdtemp(*args, **kwargs):
         # Force tempfile to use the allowed temp directory
+        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
         kwargs['dir'] = '${escapedTempDir}'
         return _original_mkdtemp(*args, **kwargs)
     
     def _safe_NamedTemporaryFile(*args, **kwargs):
         # Force tempfile to use the allowed temp directory
-        if 'dir' not in kwargs:
-            kwargs['dir'] = '${escapedTempDir}'
+        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+        kwargs['dir'] = '${escapedTempDir}'
         return _original_NamedTemporaryFile(*args, **kwargs)
     
     def _safe_TemporaryDirectory(*args, **kwargs):
         # Force tempfile to use the allowed temp directory
-        if 'dir' not in kwargs:
-            kwargs['dir'] = '${escapedTempDir}'
+        if 'dir' in kwargs and not _is_path_allowed(kwargs['dir']):
+            raise PermissionError(f"Access denied: {kwargs['dir']} is outside allowed directories")
+        kwargs['dir'] = '${escapedTempDir}'
         return _original_TemporaryDirectory(*args, **kwargs)
     
     _tempfile_module.mkstemp = _safe_mkstemp
