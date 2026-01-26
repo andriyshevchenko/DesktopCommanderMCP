@@ -7,7 +7,11 @@ async function testExecutePythonCode() {
   console.log("=== Testing execute_python_code tool ===\n");
 
   let failedTests = 0;
-  const totalTests = 6;
+  
+  // Check if network tests should be run - accept common truthy values
+  const networkTestsEnv = (process.env.RUN_NETWORK_TESTS || '').toLowerCase();
+  const runNetworkTests = ['1', 'true', 'yes', 'on'].includes(networkTestsEnv);
+  const totalTests = runNetworkTests ? 6 : 5;
 
   // Test 1: Simple code execution
   console.log("Test 1: Simple Python code execution");
@@ -24,9 +28,9 @@ async function testExecutePythonCode() {
 
   // Test 2: File operations in target directory
   console.log("Test 2: File operations in allowed directory");
+  const testDir2 = path.join(os.tmpdir(), `test-python-${Date.now()}`);
   try {
-    const testDir = path.join(os.tmpdir(), `test-python-${Date.now()}`);
-    await fs.mkdir(testDir, { recursive: true });
+    await fs.mkdir(testDir2, { recursive: true });
     
     const result = await executePythonCode({
       code: `
@@ -37,12 +41,12 @@ with open('test.txt', 'r') as f:
     content = f.read()
     print(f'File content: {content}')
 `,
-      target_directory: testDir
+      target_directory: testDir2
     });
     console.log("Result:", JSON.stringify(result, null, 2));
     
     // Verify file was created
-    const fileExists = await fs.access(path.join(testDir, 'test.txt'))
+    const fileExists = await fs.access(path.join(testDir2, 'test.txt'))
       .then(() => true)
       .catch(() => false);
     
@@ -52,24 +56,28 @@ with open('test.txt', 'r') as f:
       console.log("✗ Test 2 failed - File was not created\n");
       failedTests++;
     }
-    
-    // Cleanup
-    await fs.rm(testDir, { recursive: true, force: true });
   } catch (error) {
     console.error("✗ Test 2 failed:", error);
     failedTests++;
+  } finally {
+    // Cleanup
+    try {
+      await fs.rm(testDir2, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors - temp directory may already be removed
+    }
   }
 
   // Test 3: Filesystem restriction - attempt to access denied directory
   console.log("Test 3: Filesystem restriction test");
+  const testDir3 = path.join(os.tmpdir(), `test-python-restricted-${Date.now()}`);
+  const unauthorizedDir3 = path.join(os.tmpdir(), `test-python-unauthorized-${Date.now()}`);
   try {
-    const testDir = path.join(os.tmpdir(), `test-python-restricted-${Date.now()}`);
-    await fs.mkdir(testDir, { recursive: true });
+    await fs.mkdir(testDir3, { recursive: true });
     
     // Create a separate unauthorized directory that's writable but outside allowed directories
-    const unauthorizedDir = path.join(os.tmpdir(), `test-python-unauthorized-${Date.now()}`);
-    await fs.mkdir(unauthorizedDir, { recursive: true });
-    const unauthorizedPath = path.join(unauthorizedDir, 'unauthorized.txt');
+    await fs.mkdir(unauthorizedDir3, { recursive: true });
+    const unauthorizedPath = path.join(unauthorizedDir3, 'unauthorized.txt');
     // Escape backslashes for Windows paths in Python string literals
     const escapedUnauthorizedPath = unauthorizedPath.replace(/\\/g, '\\\\');
     
@@ -83,7 +91,7 @@ try:
 except PermissionError as e:
     print(f'Correctly blocked: {e}')
 `,
-      target_directory: testDir
+      target_directory: testDir3
     });
     console.log("Result:", JSON.stringify(result, null, 2));
     
@@ -100,21 +108,25 @@ except PermissionError as e:
       console.log("✗ Test 3 failed - Unexpected result structure\n");
       failedTests++;
     }
-    
-    // Cleanup
-    await fs.rm(testDir, { recursive: true, force: true });
-    await fs.rm(unauthorizedDir, { recursive: true, force: true });
   } catch (error) {
     console.error("✗ Test 3 failed:", error);
     failedTests++;
+  } finally {
+    // Cleanup
+    try {
+      await fs.rm(testDir3, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors - temp directory may already be removed
+    }
+    try {
+      await fs.rm(unauthorizedDir3, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors - temp directory may already be removed
+    }
   }
 
   // Test 4: Package installation (if pip is available)
   console.log("Test 4: Package installation test");
-  
-  // Check if network tests should be run - accept common truthy values
-  const networkTestsEnv = (process.env.RUN_NETWORK_TESTS || '').toLowerCase();
-  const runNetworkTests = ['1', 'true', 'yes', 'on'].includes(networkTestsEnv);
   
   if (!runNetworkTests) {
     console.log("⊘ Test 4 skipped - Set RUN_NETWORK_TESTS=1 to enable network-dependent tests\n");
