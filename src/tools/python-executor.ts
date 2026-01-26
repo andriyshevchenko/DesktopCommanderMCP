@@ -526,18 +526,45 @@ async function installPythonPackages(
 
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
-    const proc = spawn(pythonCmd, args);
+    
+    // Use minimal whitelisted environment to avoid leaking secrets
+    const env = {
+      PATH: process.env.PATH || '',
+      HOME: process.env.HOME || '',
+      TMPDIR: process.env.TMPDIR || os.tmpdir(),
+      TEMP: process.env.TEMP || '',
+      TMP: process.env.TMP || '',
+      // Platform-specific essentials
+      ...(process.platform === 'win32' ? {
+        SYSTEMROOT: process.env.SYSTEMROOT || '',
+        WINDIR: process.env.WINDIR || '',
+        USERNAME: process.env.USERNAME || '',
+      } : {
+        USER: process.env.USER || '',
+        LOGNAME: process.env.LOGNAME || '',
+      }),
+    };
+    
+    const proc = spawn(pythonCmd, args, { env });
 
     let stdout = '';
     let stderr = '';
     let timeoutId: NodeJS.Timeout | null = null;
+    let killTimeoutId: NodeJS.Timeout | null = null;
     let isTimedOut = false;
 
-    // Set up timeout
+    // Set up timeout with two-stage termination
     if (timeout_ms > 0) {
       timeoutId = setTimeout(() => {
         isTimedOut = true;
         proc.kill('SIGTERM');
+        
+        // If process doesn't exit after SIGTERM, force kill after grace period
+        killTimeoutId = setTimeout(() => {
+          if (!proc.killed) {
+            proc.kill('SIGKILL');
+          }
+        }, 5000); // 5 second grace period
       }, timeout_ms);
     }
 
@@ -553,6 +580,7 @@ async function installPythonPackages(
     // ensuring we've captured all output. 'exit' can fire before stdio is fully read.
     proc.on('close', (exitCode) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
 
       if (isTimedOut) {
         resolve({
@@ -614,7 +642,7 @@ async function executePythonScript(
 
   return new Promise((resolve) => {
     // Use minimal whitelisted environment to avoid leaking secrets
-    const env = {
+    const env: Record<string, string> = {
       PATH: process.env.PATH || '',
       HOME: process.env.HOME || '',
       TMPDIR: process.env.TMPDIR || '',
@@ -644,13 +672,21 @@ async function executePythonScript(
     let stdout = '';
     let stderr = '';
     let timeoutId: NodeJS.Timeout | null = null;
+    let killTimeoutId: NodeJS.Timeout | null = null;
     let isTimedOut = false;
 
-    // Set up timeout
+    // Set up timeout with two-stage termination
     if (timeout_ms > 0) {
       timeoutId = setTimeout(() => {
         isTimedOut = true;
         proc.kill('SIGTERM');
+        
+        // If process doesn't exit after SIGTERM, force kill after grace period
+        killTimeoutId = setTimeout(() => {
+          if (!proc.killed) {
+            proc.kill('SIGKILL');
+          }
+        }, 5000); // 5 second grace period
       }, timeout_ms);
     }
 
@@ -666,6 +702,7 @@ async function executePythonScript(
     // ensuring we've captured all output. 'exit' can fire before stdio is fully read.
     proc.on('close', (exitCode) => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (killTimeoutId) clearTimeout(killTimeoutId);
 
       if (isTimedOut) {
         resolve({
