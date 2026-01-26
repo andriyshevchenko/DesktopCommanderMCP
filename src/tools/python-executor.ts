@@ -509,7 +509,8 @@ except Exception as e:
  * - PATH: Required for Python and pip to find executables
  * - HOME: Used by Python for user site-packages and config files
  * - TMPDIR/TEMP/TMP: Required for temporary file operations
- * - Platform-specific: SYSTEMROOT/WINDIR/USERNAME (Windows) or USER/LOGNAME (Unix)
+ * - Platform-specific (Windows): SYSTEMROOT, WINDIR, USERNAME, USERPROFILE, APPDATA, LOCALAPPDATA
+ * - Platform-specific (Unix): USER, LOGNAME, LANG, LC_ALL
  * 
  * @returns A minimal environment object safe for use with Python subprocesses
  */
