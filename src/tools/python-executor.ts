@@ -391,6 +391,8 @@ try:
             return super().symlink_to(target)
         
         def link_to(self, target):
+            # link_to creates a hard link at target pointing to self
+            # Hard links require both paths to be accessible and on the same filesystem
             self._check_access()
             if not _is_path_allowed(str(target)):
                 raise PermissionError(f"Access denied: {target} is outside allowed directories")
