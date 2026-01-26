@@ -667,11 +667,8 @@ async function executePythonScript(
   return new Promise((resolve) => {
     const env = buildMinimalEnvironment();
     
-    // Add packages directory to PYTHONPATH (preserve existing if present)
-    const existingPythonPath = process.env.PYTHONPATH;
-    env.PYTHONPATH = existingPythonPath 
-      ? `${packagesDir}${path.delimiter}${existingPythonPath}`
-      : packagesDir;
+    // Add only the managed packages directory to PYTHONPATH to avoid leaking host env
+    env.PYTHONPATH = packagesDir;
 
     const proc = spawn(pythonCmd, [scriptPath], {
       env
