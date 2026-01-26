@@ -499,7 +499,7 @@ function buildMinimalEnvironment(): Record<string, string> {
   return {
     PATH: process.env.PATH || '',
     HOME: process.env.HOME || '',
-    TMPDIR: process.env.TMPDIR || os.tmpdir(),
+    TMPDIR: process.env.TMPDIR || '',
     TEMP: process.env.TEMP || '',
     TMP: process.env.TMP || '',
     // Platform-specific essentials
@@ -565,7 +565,8 @@ async function installPythonPackages(
         
         // If process doesn't exit after SIGTERM, force kill after grace period
         killTimeoutId = setTimeout(() => {
-          if (!proc.killed) {
+          // Only send SIGKILL if process hasn't exited yet
+          if (proc.exitCode === null && proc.signalCode === null) {
             proc.kill('SIGKILL');
           }
         }, 5000); // 5 second grace period
@@ -672,7 +673,8 @@ async function executePythonScript(
         
         // If process doesn't exit after SIGTERM, force kill after grace period
         killTimeoutId = setTimeout(() => {
-          if (!proc.killed) {
+          // Only send SIGKILL if process hasn't exited yet
+          if (proc.exitCode === null && proc.signalCode === null) {
             proc.kill('SIGKILL');
           }
         }, 5000); // 5 second grace period
