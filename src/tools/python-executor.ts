@@ -493,6 +493,28 @@ except Exception as e:
 }
 
 /**
+ * Build a minimal whitelisted environment to avoid leaking secrets
+ */
+function buildMinimalEnvironment(): Record<string, string> {
+  return {
+    PATH: process.env.PATH || '',
+    HOME: process.env.HOME || '',
+    TMPDIR: process.env.TMPDIR || os.tmpdir(),
+    TEMP: process.env.TEMP || '',
+    TMP: process.env.TMP || '',
+    // Platform-specific essentials
+    ...(process.platform === 'win32' ? {
+      SYSTEMROOT: process.env.SYSTEMROOT || '',
+      WINDIR: process.env.WINDIR || '',
+      USERNAME: process.env.USERNAME || '',
+    } : {
+      USER: process.env.USER || '',
+      LOGNAME: process.env.LOGNAME || '',
+    }),
+  };
+}
+
+/**
  * Install Python packages using pip
  */
 async function installPythonPackages(
@@ -526,25 +548,7 @@ async function installPythonPackages(
 
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
-    
-    // Use minimal whitelisted environment to avoid leaking secrets
-    const env = {
-      PATH: process.env.PATH || '',
-      HOME: process.env.HOME || '',
-      TMPDIR: process.env.TMPDIR || os.tmpdir(),
-      TEMP: process.env.TEMP || '',
-      TMP: process.env.TMP || '',
-      // Platform-specific essentials
-      ...(process.platform === 'win32' ? {
-        SYSTEMROOT: process.env.SYSTEMROOT || '',
-        WINDIR: process.env.WINDIR || '',
-        USERNAME: process.env.USERNAME || '',
-      } : {
-        USER: process.env.USER || '',
-        LOGNAME: process.env.LOGNAME || '',
-      }),
-    };
-    
+    const env = buildMinimalEnvironment();
     const proc = spawn(pythonCmd, args, { env });
 
     let stdout = '';
@@ -642,23 +646,7 @@ async function executePythonScript(
   }
 
   return new Promise((resolve) => {
-    // Use minimal whitelisted environment to avoid leaking secrets
-    const env: Record<string, string> = {
-      PATH: process.env.PATH || '',
-      HOME: process.env.HOME || '',
-      TMPDIR: process.env.TMPDIR || '',
-      TEMP: process.env.TEMP || '',
-      TMP: process.env.TMP || '',
-      // Platform-specific essentials
-      ...(process.platform === 'win32' ? {
-        SYSTEMROOT: process.env.SYSTEMROOT || '',
-        WINDIR: process.env.WINDIR || '',
-        USERNAME: process.env.USERNAME || '',
-      } : {
-        USER: process.env.USER || '',
-        LOGNAME: process.env.LOGNAME || '',
-      }),
-    };
+    const env = buildMinimalEnvironment();
     
     // Add packages directory to PYTHONPATH (preserve existing if present)
     const existingPythonPath = process.env.PYTHONPATH;
