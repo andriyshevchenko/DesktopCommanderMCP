@@ -62,12 +62,14 @@ with open('test.txt', 'r') as f:
     
     // Use a path that's clearly outside allowed directories (platform-specific)
     const unauthorizedPath = os.platform() === 'win32' ? 'C:\\Windows\\unauthorized.txt' : '/etc/unauthorized.txt';
+    // Escape backslashes for Windows paths in Python string literals
+    const escapedUnauthorizedPath = unauthorizedPath.replace(/\\/g, '\\\\');
     
     const result = await executePythonCode({
       code: `
 try:
     # Try to write to unauthorized location (should be blocked)
-    with open('${unauthorizedPath}', 'w') as f:
+    with open('${escapedUnauthorizedPath}', 'w') as f:
         f.write('This should not work')
     print('ERROR: Was able to write to unauthorized location!')
 except PermissionError as e:

@@ -572,13 +572,13 @@ print(f'Top customers: {df.groupby("customer").sum().sort_values("amount", ascen
 
 **Security Notes:**
 
-⚠️ **Important**: The Python sandbox provides filesystem access restrictions but has limitations:
-- Filesystem operations via `open()` and common `os.*` functions are restricted to `target_directory` and temp directory
-- Attempts to access other locations through these functions will raise `PermissionError`
-- The sandbox resolves symbolic links to prevent path traversal attacks
-- **However**: Other Python modules (e.g., `subprocess`, `shutil`, advanced `pathlib` methods) may bypass these restrictions
+⚠️ **Important**: The Python sandbox is a convenience feature, **not** a security boundary:
+- It is designed to encourage working within the specified `target_directory` and temp directory, but it does **not** comprehensively restrict all filesystem access
+- The sandbox attempts to gate common operations like `open()` and some `os.*` functions, but the underlying Python runtime (including original built-in functions and operations like `os.rename`/`os.symlink`) may still be reachable from user code
+- Other Python modules (e.g., `subprocess`, `shutil`, advanced `pathlib` methods) can bypass any best-effort checks
+- The sandbox resolves symbolic links to prevent basic path traversal attacks
 - Network operations are allowed for package installation
-- **Recommendation**: Only execute trusted Python code. For complete isolation, use the Docker setup below
+- **Recommendation**: Treat any Python run via this tool as having access to your user account's files and network. Only execute trusted Python code. For strong isolation, use the Docker setup below
 
 ### Docker Support
 

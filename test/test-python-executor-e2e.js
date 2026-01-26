@@ -203,6 +203,8 @@ async function testFilesystemRestrictions(client) {
     const unauthorizedPath = os.platform() === 'win32' 
       ? 'C:\\Windows\\unauthorized.txt' 
       : '/etc/unauthorized.txt';
+    // Escape backslashes for Windows paths in Python string literals
+    const escapedUnauthorizedPath = unauthorizedPath.replace(/\\/g, '\\\\');
     
     const result = await client.callTool({
       name: 'execute_python_code',
@@ -210,7 +212,7 @@ async function testFilesystemRestrictions(client) {
         code: `
 import sys
 try:
-    with open('${unauthorizedPath}', 'w') as f:
+    with open('${escapedUnauthorizedPath}', 'w') as f:
         f.write('Should not work')
     print('ERROR: Access was allowed!', file=sys.stderr)
 except PermissionError as e:
