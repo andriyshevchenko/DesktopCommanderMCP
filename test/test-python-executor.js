@@ -101,7 +101,7 @@ except PermissionError as e:
       if (output.includes('Correctly blocked') || output.includes('PermissionError')) {
         // Also verify the file was NOT created in the unauthorized directory
         try {
-          await fs.access(unauthorizedPath3);
+          await fs.access(unauthorizedPath);
           console.log("✗ Test 3 failed - File was created in unauthorized directory despite error\n");
           failedTests++;
         } catch {
