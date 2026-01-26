@@ -214,7 +214,7 @@ export const GetRecentToolCallsArgsSchema = z.object({
 export const ExecutePythonCodeArgsSchema = z.object({
   code: z.string(),
   target_directory: z.string().optional(),
-  timeout_ms: z.number().optional().default(30000),
+  timeout_ms: z.number().int().min(1000).max(300000).optional().default(30000),
   install_packages: z.array(z.string()).optional(),
 });
 
