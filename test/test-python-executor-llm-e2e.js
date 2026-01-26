@@ -87,7 +87,9 @@ async function createMcpClient() {
 
 /**
  * Parse JSON with fallback for OpenAI's invalid escape sequences
- * OpenAI sometimes returns Python code with \' which is invalid in JSON
+ * OpenAI sometimes returns Python code with \' which is invalid in JSON.
+ * Note: Currently handles only \' sequences. If other escape issues arise,
+ * this function can be extended to handle additional patterns.
  */
 function parseToolArguments(jsonString) {
   try {
