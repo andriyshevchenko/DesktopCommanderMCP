@@ -40,9 +40,15 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
       resolvedTargetDir = path.resolve(process.cwd(), resolvedTargetDir);
     }
 
-    // Verify target directory exists
+    // Verify target directory exists and is a directory
     try {
-      await fs.access(resolvedTargetDir);
+      const stats = await fs.stat(resolvedTargetDir);
+      if (!stats.isDirectory()) {
+        return {
+          content: [{ type: "text", text: `Error: Target path is not a directory: ${resolvedTargetDir}` }],
+          isError: true,
+        };
+      }
     } catch {
       return {
         content: [{ type: "text", text: `Error: Target directory does not exist: ${resolvedTargetDir}` }],
@@ -607,14 +613,26 @@ async function executePythonScript(
   }
 
   return new Promise((resolve) => {
-    const env = { ...process.env };
+    // Use minimal whitelisted environment to avoid leaking secrets
+    const env = {
+      PATH: process.env.PATH || '',
+      HOME: process.env.HOME || '',
+      TMPDIR: process.env.TMPDIR || '',
+      TEMP: process.env.TEMP || '',
+      TMP: process.env.TMP || '',
+      // Platform-specific essentials
+      ...(process.platform === 'win32' ? {
+        SYSTEMROOT: process.env.SYSTEMROOT || '',
+        WINDIR: process.env.WINDIR || '',
+        USERNAME: process.env.USERNAME || '',
+      } : {
+        USER: process.env.USER || '',
+        LOGNAME: process.env.LOGNAME || '',
+      }),
+    };
     
     // Add packages directory to PYTHONPATH
-    if (env.PYTHONPATH) {
-      env.PYTHONPATH = `${packagesDir}${path.delimiter}${env.PYTHONPATH}`;
-    } else {
-      env.PYTHONPATH = packagesDir;
-    }
+    env.PYTHONPATH = packagesDir;
 
     const proc = spawn(pythonCmd, [scriptPath], {
       env

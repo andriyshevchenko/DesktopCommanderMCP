@@ -44,8 +44,5 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
       
-      - name: Build project
-        run: npm run build
-      
       - name: Run all tests
         run: npm test

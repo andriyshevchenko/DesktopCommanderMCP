@@ -261,6 +261,15 @@ except PermissionError as e:
 async function testPackageInstallation(client) {
   logTest('Automatic Package Installation');
   
+  // Check if network tests should be run - accept common truthy values
+  const networkTestsEnv = (process.env.RUN_NETWORK_TESTS || '').toLowerCase();
+  const runNetworkTests = ['1', 'true', 'yes', 'on'].includes(networkTestsEnv);
+  
+  if (!runNetworkTests) {
+    logInfo('⊘ Skipped - Set RUN_NETWORK_TESTS=1 to enable network-dependent tests');
+    return null; // null indicates skipped test
+  }
+  
   try {
     const result = await client.callTool({
       name: 'execute_python_code',
@@ -478,9 +487,13 @@ async function runE2ETests() {
     ];
     
     for (const test of tests) {
-      totalTests++;
       const passed = await test.fn(client);
-      if (passed) passCount++;
+      
+      // null means skipped test
+      if (passed !== null) {
+        totalTests++;
+        if (passed) passCount++;
+      }
       
       // Small delay between tests
       await new Promise(resolve => setTimeout(resolve, 500));

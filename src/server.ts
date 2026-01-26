@@ -1007,7 +1007,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         PARAMETERS:
                         - code: Python code to execute (required)
-                        - target_directory: Working directory with read/write access (optional, defaults to current directory)
+                        - target_directory: Working directory with read/write access (optional; if omitted, a new isolated temporary directory is used—pass this explicitly to work with existing files)
                         - timeout_ms: Execution timeout in milliseconds (optional, default: 30000)
                         - install_packages: Array of pip package names to install before execution (optional)
                         
