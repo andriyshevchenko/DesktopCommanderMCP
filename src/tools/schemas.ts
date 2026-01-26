@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+// Python package name validation regex
+// Validates pip package names with version specifiers and extras
+// Allowed characters: letters, digits, hyphens, underscores, dots, brackets for extras,
+// comparison operators (>, <, =, !), and commas for multiple version constraints
+// Must not start with '-' to prevent argument injection
+export const PACKAGE_NAME_REGEX = /^(?!-)[A-Za-z0-9_.\-\[\]>=<,!]+$/;
+
 // Config tools schemas
 export const GetConfigArgsSchema = z.object({});
 
@@ -221,9 +228,9 @@ export const ExecutePythonCodeArgsSchema = z.object({
         .string()
         .trim()
         .min(1, { message: "package name must not be empty" })
-        .regex(/^(?!-)[A-Za-z0-9_.\-\[\]>=<,! ]+$/, {
+        .regex(PACKAGE_NAME_REGEX, {
           message:
-            "invalid package name: must not start with '-' and may only contain letters, digits, '_', '.', '-', spaces, and version specifiers ([, ], =, <, >, ,, !)",
+            "invalid package name: must not start with '-' and may only contain letters, digits, '_', '.', '-', and version specifiers ([, ], =, <, >, ,, !)",
         }),
     )
     .optional(),

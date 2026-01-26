@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { ExecutePythonCodeArgsSchema } from './schemas.js';
+import { ExecutePythonCodeArgsSchema, PACKAGE_NAME_REGEX } from './schemas.js';
 import { ServerResult } from '../types.js';
 
 /**
@@ -578,15 +578,12 @@ async function installPythonPackages(
     }
     
     // Check for invalid characters (aligned with schema validation)
-    // Pip package names with version specifiers can contain: letters, digits, hyphens, underscores, dots,
-    // brackets for extras, comparison operators (>, <, =, !), commas, and spaces
     // This provides defense in depth against shell injection even though spawn() with array args mitigates it
-    const validPackageNameRegex = /^(?!-)[A-Za-z0-9_.\-\[\]>=<,! ]+$/;
-    if (!validPackageNameRegex.test(pkg)) {
+    if (!PACKAGE_NAME_REGEX.test(pkg)) {
       return {
         content: [{
           type: "text",
-          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', spaces, and version specifiers ([, ], =, <, >, ,, !).`
+          text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', and version specifiers ([, ], =, <, >, ,, !).`
         }],
         isError: true
       };
