@@ -196,12 +196,12 @@ async function testFilesystemRestrictions(client) {
   logTest('Filesystem Access Restrictions');
   
   const testDir = path.join(os.tmpdir(), `e2e-python-restricted-${Date.now()}`);
+  const unauthorizedDir = path.join(os.tmpdir(), `e2e-python-unauthorized-${Date.now()}`);
   
   try {
     await fs.mkdir(testDir, { recursive: true });
     
     // Create a separate, normally writable directory outside the allowed target_directory
-    const unauthorizedDir = path.join(os.tmpdir(), `e2e-python-unauthorized-${Date.now()}`);
     await fs.mkdir(unauthorizedDir, { recursive: true });
     const unauthorizedPath = path.join(unauthorizedDir, 'unauthorized.txt');
     // Escape backslashes for Windows paths in Python string literals
@@ -226,16 +226,11 @@ except PermissionError as e:
     
     if (result.isError) {
       logFail(`Unexpected error: ${JSON.stringify(result)}`);
-      // Cleanup unauthorized dir
-      await fs.rm(unauthorizedDir, { recursive: true, force: true });
       return false;
     }
     
     const output = result.content[0].text;
     logInfo(`Output: ${output}`);
-    
-    // Cleanup unauthorized dir
-    await fs.rm(unauthorizedDir, { recursive: true, force: true });
     
     if (output.includes('Access correctly blocked') || output.includes('PermissionError')) {
       logPass('Filesystem restrictions working correctly');
@@ -248,9 +243,12 @@ except PermissionError as e:
     logFail(`Exception: ${error.message}`);
     return false;
   } finally {
-    // Cleanup
+    // Cleanup both directories
     try {
       await fs.rm(testDir, { recursive: true, force: true });
+    } catch {}
+    try {
+      await fs.rm(unauthorizedDir, { recursive: true, force: true });
     } catch {}
   }
 }
