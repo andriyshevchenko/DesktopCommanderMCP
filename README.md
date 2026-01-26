@@ -574,8 +574,8 @@ print(f'Top customers: {df.groupby("customer").sum().sort_values("amount", ascen
 
 ⚠️ **Important**: The Python sandbox is a convenience feature, **not** a security boundary:
 - It is designed to encourage working within the specified `target_directory` and temp directory, but it does **not** comprehensively restrict all filesystem access
-- The sandbox wraps common high-level operations like `open()` and some `os.*` functions (e.g., `listdir`, `mkdir`, `remove`, `rename`, `chmod`), but **low-level file APIs** like `os.open`, `os.stat`, and file-descriptor operations are **not wrapped** and can bypass restrictions
-- Other Python modules (e.g., `subprocess`, `shutil`, advanced `pathlib` methods) can bypass any best-effort checks
+- The sandbox wraps common high-level operations like `open()`, some `os.*` functions (e.g., `listdir`, `mkdir`, `remove`, `rename`, `chmod`), many `shutil` helpers (e.g., `copy`, `copy2`, `copyfile`, `move`, `rmtree`, `copytree`), and common `pathlib.Path` methods, but **low-level file APIs** like `os.open`, `os.stat`, and direct file-descriptor operations are **not wrapped** and can bypass restrictions
+- Other Python modules like `subprocess`, and unwrapped file operations in the standard library, can still bypass these best-effort checks; not all possible file operations are intercepted
 - The sandbox resolves symbolic links to prevent basic path traversal attacks
 - Network operations are allowed for package installation
 - **Recommendation**: Treat any Python run via this tool as having access to your user account's files and network. Only execute trusted Python code. For strong isolation, use the Docker setup below
