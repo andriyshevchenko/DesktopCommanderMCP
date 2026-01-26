@@ -509,7 +509,8 @@ except Exception as e:
  * - PATH: Required for Python and pip to find executables
  * - HOME: Used by Python for user site-packages and config files
  * - TMPDIR/TEMP/TMP: Required for temporary file operations
- * - Platform-specific: SYSTEMROOT/WINDIR/USERNAME (Windows) or USER/LOGNAME (Unix)
+ * - Platform-specific (Windows): SYSTEMROOT, WINDIR, USERNAME, USERPROFILE, APPDATA, LOCALAPPDATA
+ * - Platform-specific (Unix): USER, LOGNAME, LANG, LC_ALL
  * 
  * @returns A minimal environment object safe for use with Python subprocesses
  */
@@ -525,9 +526,16 @@ function buildMinimalEnvironment(): Record<string, string> {
       SYSTEMROOT: process.env.SYSTEMROOT || '',
       WINDIR: process.env.WINDIR || '',
       USERNAME: process.env.USERNAME || '',
+      // Python/pip often rely on these directories on Windows
+      USERPROFILE: process.env.USERPROFILE || '',
+      APPDATA: process.env.APPDATA || '',
+      LOCALAPPDATA: process.env.LOCALAPPDATA || '',
     } : {
       USER: process.env.USER || '',
       LOGNAME: process.env.LOGNAME || '',
+      // Common locale settings that Python may need
+      LANG: process.env.LANG || '',
+      LC_ALL: process.env.LC_ALL || '',
     }),
   };
 }
