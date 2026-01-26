@@ -86,6 +86,27 @@ async function createMcpClient() {
 }
 
 /**
+ * Parse JSON with fallback for OpenAI's invalid escape sequences
+ * OpenAI sometimes returns Python code with \' which is invalid in JSON
+ */
+function parseToolArguments(jsonString) {
+  try {
+    // First, try standard JSON parsing
+    return JSON.parse(jsonString);
+  } catch (firstError) {
+    try {
+      // If that fails, try to fix common OpenAI escape issues
+      // Replace \' with ' (since \' is not a valid JSON escape sequence)
+      const fixed = jsonString.replace(/\\'/g, "'");
+      return JSON.parse(fixed);
+    } catch (secondError) {
+      // If both fail, throw the original error with more context
+      throw new Error(`${firstError.message} (also tried fixing escape sequences)`);
+    }
+  }
+}
+
+/**
  * Call OpenAI API to use MCP tool
  */
 async function callOpenAIWithMCP(client, prompt, testDir) {
@@ -123,7 +144,8 @@ async function callOpenAIWithMCP(client, prompt, testDir) {
           role: 'system',
           content: `You are a helpful assistant with access to a Python code execution tool. 
 When asked to perform data analysis or Python tasks, use the execute_python_code tool.
-If you need to work with files, use the target_directory parameter set to: ${testDir}`
+If you need to work with files, use the target_directory parameter set to: ${testDir}
+IMPORTANT: When writing Python code, prefer using double quotes for strings instead of single quotes to avoid JSON escaping issues.`
         },
         {
           role: 'user',
@@ -173,7 +195,7 @@ async function testLLMSimpleCalculation(client) {
         let args;
         try {
           // Execute the tool call through MCP
-          args = JSON.parse(toolCall.function.arguments);
+          args = parseToolArguments(toolCall.function.arguments);
         } catch (parseError) {
           logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           return false;
@@ -246,7 +268,7 @@ async function testLLMFileAnalysis(client) {
         let args;
         try {
           // Parse the arguments - handle potential escaping issues from OpenAI
-          args = JSON.parse(toolCall.function.arguments);
+          args = parseToolArguments(toolCall.function.arguments);
         } catch (parseError) {
           logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
@@ -321,7 +343,7 @@ async function testLLMErrorHandling(client) {
       if (toolCall.function.name === 'execute_python_code') {
         let args;
         try {
-          args = JSON.parse(toolCall.function.arguments);
+          args = parseToolArguments(toolCall.function.arguments);
         } catch (parseError) {
           logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           return false;
@@ -394,7 +416,7 @@ async function testLLMDataProcessingWithFileWrite(client) {
       if (toolCall.function.name === 'execute_python_code') {
         let args;
         try {
-          args = JSON.parse(toolCall.function.arguments);
+          args = parseToolArguments(toolCall.function.arguments);
         } catch (parseError) {
           logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
