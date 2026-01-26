@@ -378,7 +378,7 @@ async function testLLMDataProcessingWithFileWrite(client) {
     
     const response = await callOpenAIWithMCP(
       client,
-      `Read sales_data.csv, calculate total annual sales for each product using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely. Use .items() instead of .iteritems() for compatibility with pandas 2.x.`,
+      `Read sales_data.csv which has columns: product, sales_q1, sales_q2, sales_q3, sales_q4. Calculate total annual sales for each product by summing all quarterly sales columns using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely. Use .items() instead of .iteritems() for compatibility with pandas 2.x.`,
       testDir
     );
     
