@@ -684,7 +684,7 @@ export default async function uninstall() {
             logToFile('The MCP server has been removed from Claude\'s configuration.');
 
             logToFile('\nIf you want to reinstall later, you can run:');
-            logToFile('npx @wonderwhy-er/desktop-commander@latest setup');
+            logToFile('npx desktop-commander-enhanced@latest setup');
 
             logToFile('\n🎁 We\'re sorry to see you leaving, we’d love to understand your decision not to use Desktop Commander.')
             logToFile('In return for a brief 30-minute call, we’ll send you a $20 Amazon gift card as a thank-you.');

@@ -1,5 +1,5 @@
 {
-  "name": "@wonderwhy-er/desktop-commander",
+  "name": "desktop-commander-enhanced",
   "version": "0.3.0",
   "description": "MCP server for terminal operations and file editing",
   "mcpName": "io.github.wonderwhy-er/desktop-commander",

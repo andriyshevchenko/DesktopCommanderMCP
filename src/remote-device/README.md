@@ -23,7 +23,7 @@ Before running the device, ensure you have:
 2.  **Desktop Commander MCP Server**: Installed and capable of running.
     *   **Global Install (Recommended)**:
         ```bash
-        npm install -g @wonderwhy-er/desktop-commander
+        npm install -g desktop-commander-enhanced
         ```
     *   **Local Build**: If you are developing locally, the device can also find the server in `../../dist/index.js`.
 

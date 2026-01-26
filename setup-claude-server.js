@@ -209,21 +209,21 @@ function detectShell() {
 // Function to get the package spec that was used to run this script
 function getPackageSpec(versionArg = null) {
   // If explicit version/tag argument provided, use it
-  // Usage: npx @wonderwhy-er/desktop-commander setup alpha
+  // Usage: npx desktop-commander-enhanced setup alpha
   if (versionArg) {
-    return `@wonderwhy-er/desktop-commander@${versionArg}`;
+    return `desktop-commander-enhanced@${versionArg}`;
   }
   
   // Check if running via npx - look for the package spec in process.argv
-  // e.g., npx @wonderwhy-er/desktop-commander@0.2.18-alpha setup
+  // e.g., npx desktop-commander-enhanced@0.2.18-alpha setup
   const argv = process.argv;
   
   // Look for the package name in argv
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.includes('@wonderwhy-er/desktop-commander')) {
-      // Extract just the package spec (e.g., @wonderwhy-er/desktop-commander@0.2.18-alpha)
-      const match = arg.match(/(@wonderwhy-er\/desktop-commander(@[^\/\s]+)?)/);
+    if (arg.includes('desktop-commander-enhanced')) {
+      // Extract just the package spec (e.g., desktop-commander-enhanced@0.2.18-alpha)
+      const match = arg.match(/(desktop-commander-enhanced(@[^\/\s]+)?)/);
       if (match) {
         return match[1];
       }
@@ -231,7 +231,7 @@ function getPackageSpec(versionArg = null) {
   }
   
   // Fallback to @latest if we can't detect
-  return '@wonderwhy-er/desktop-commander@latest';
+  return 'desktop-commander-enhanced@latest';
 }
 
 function isNPX() {
