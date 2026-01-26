@@ -66,7 +66,10 @@ jobs:
   e2e-llm:
     name: E2E Tests (LLM Integration)
     runs-on: ubuntu-latest
-    # Run on push/PR if OPENAI_API_KEY is available, or on manual trigger
+    # Run on push/PR events (checks for OPENAI_API_KEY availability inside the job)
+    # or on manual trigger when explicitly requested
+    # Note: We cannot check secret availability in job-level 'if' conditions,
+    # so the job runs but skips test execution if the key is not configured
     if: |
       (github.event_name == 'push' || github.event_name == 'pull_request') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.run_llm_tests == 'true')

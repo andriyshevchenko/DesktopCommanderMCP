@@ -126,7 +126,7 @@ test.yml         (requires build to pass)
   ↓
 e2e.yml          (requires tests to pass)
   ├─ e2e-mcp     (always runs)
-  └─ e2e-llm     (manual trigger only)
+  └─ e2e-llm     (runs on push/PR with key availability check; can be triggered manually)
 ```
 
 ## Matrix Testing Strategy
