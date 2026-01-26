@@ -999,10 +999,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         SECURITY:
                         The code runs with filesystem access restrictions:
-                        - Python's open() and os.* functions are wrapped to restrict access to target_directory and temp directory
+                        - Python's open() and some os.* functions (e.g., listdir, mkdir, remove, rename, chmod) are wrapped to restrict access to target_directory and temp directory
                         - Symbolic links are resolved to prevent path traversal attacks
                         - Unauthorized access attempts raise PermissionError
-                        - LIMITATION: Advanced Python modules (subprocess, shutil, etc.) may bypass restrictions
+                        - LIMITATION: Advanced Python modules (subprocess, etc.) may bypass restrictions
                         - RECOMMENDATION: Only execute trusted Python code; use Docker for complete isolation
                         
                         PARAMETERS:

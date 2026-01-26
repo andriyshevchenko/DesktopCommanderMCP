@@ -111,9 +111,17 @@ except PermissionError as e:
 
   // Test 4: Package installation (if pip is available)
   console.log("Test 4: Package installation test");
-  try {
-    const result = await executePythonCode({
-      code: `
+  
+  // Check if network tests should be run - accept common truthy values
+  const networkTestsEnv = (process.env.RUN_NETWORK_TESTS || '').toLowerCase();
+  const runNetworkTests = ['1', 'true', 'yes', 'on'].includes(networkTestsEnv);
+  
+  if (!runNetworkTests) {
+    console.log("⊘ Test 4 skipped - Set RUN_NETWORK_TESTS=1 to enable network-dependent tests\n");
+  } else {
+    try {
+      const result = await executePythonCode({
+        code: `
 try:
     import requests
     print(f'requests module version: {requests.__version__}')
@@ -121,27 +129,27 @@ try:
 except ImportError as e:
     print(f'Failed to import: {e}')
 `,
-      install_packages: ['requests']
-    });
-    console.log("Result:", JSON.stringify(result, null, 2));
-    
-    // Validate the result
-    if (result.content && result.content[0] && result.content[0].text) {
-      const output = result.content[0].text;
-      if (!result.isError && output.includes('Package installation successful!')) {
-        console.log("✓ Test 4 passed - Package installation successful\n");
+        install_packages: ['requests']
+      });
+      console.log("Result:", JSON.stringify(result, null, 2));
+      
+      // Validate the result
+      if (result.content && result.content[0] && result.content[0].text) {
+        const output = result.content[0].text;
+        if (!result.isError && output.includes('Package installation successful!')) {
+          console.log("✓ Test 4 passed - Package installation successful\n");
+        } else {
+          console.log("✗ Test 4 failed - Package not properly installed or imported\n");
+          failedTests++;
+        }
       } else {
-        console.log("✗ Test 4 failed - Package not properly installed or imported\n");
+        console.log("✗ Test 4 failed - Unexpected result structure\n");
         failedTests++;
       }
-    } else {
-      console.log("✗ Test 4 failed - Unexpected result structure\n");
+    } catch (error) {
+      console.error("✗ Test 4 failed:", error);
       failedTests++;
     }
-  } catch (error) {
-    console.error("Note: Test 4 may fail if pip is not available or internet is not accessible");
-    console.error("Error:", error);
-    failedTests++;
   }
 
   // Test 5: Timeout test
