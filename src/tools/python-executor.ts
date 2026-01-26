@@ -93,12 +93,25 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
 }
 
 /**
+ * Escape a path for safe use in Python string literals.
+ * Handles backslashes, quotes, and control characters that could break the string.
+ */
+function escapePythonString(str: string): string {
+  return str
+    .replace(/\\/g, '\\\\')  // Escape backslashes first
+    .replace(/'/g, "\\'")     // Escape single quotes
+    .replace(/\n/g, '\\n')    // Escape newlines
+    .replace(/\r/g, '\\r')    // Escape carriage returns
+    .replace(/\t/g, '\\t');   // Escape tabs
+}
+
+/**
  * Generate Python wrapper code that restricts filesystem access
  */
 function generatePythonWrapper(userCode: string, targetDir: string, tempDir: string): string {
-  // Escape strings for Python
-  const escapedTargetDir = targetDir.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const escapedTempDir = tempDir.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  // Escape directory paths for safe embedding in Python code
+  const escapedTargetDir = escapePythonString(targetDir);
+  const escapedTempDir = escapePythonString(tempDir);
 
   return `
 import sys
@@ -266,6 +279,8 @@ async function installPythonPackages(
       stderr += data.toString();
     });
 
+    // Use 'close' event instead of 'exit': 'close' fires after all stdio streams are closed,
+    // ensuring we've captured all output. 'exit' can fire before stdio is fully read.
     proc.on('close', (exitCode) => {
       if (timeoutId) clearTimeout(timeoutId);
 
@@ -362,6 +377,8 @@ async function executePythonScript(
       stderr += data.toString();
     });
 
+    // Use 'close' event instead of 'exit': 'close' fires after all stdio streams are closed,
+    // ensuring we've captured all output. 'exit' can fire before stdio is fully read.
     proc.on('close', (exitCode) => {
       if (timeoutId) clearTimeout(timeoutId);
 
@@ -430,6 +447,7 @@ async function findPythonCommand(): Promise<string | null> {
           clearTimeout(timeout);
         };
         
+        // Use 'close' event: ensures process has fully terminated and all stdio is closed
         proc.on('close', (code) => {
           cleanup();
           resolve(code === 0);

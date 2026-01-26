@@ -47,8 +47,5 @@ jobs:
       - name: Build project
         run: npm run build
       
-      - name: Run unit tests
-        run: node test/test-python-executor.js
-      
       - name: Run all tests
         run: npm test

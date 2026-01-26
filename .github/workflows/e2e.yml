@@ -141,14 +141,15 @@ jobs:
       
       - name: LLM tests status
         run: |
-          if [ "${{ needs.e2e-llm.result }}" == "success" ]; then
+          RESULT="${{ needs.e2e-llm.result }}"
+          if [ "$RESULT" == "success" ]; then
             echo "✅ LLM E2E tests passed"
-          elif [ "${{ needs.e2e-llm.result }}" == "skipped" ]; then
-            echo "⏭️ LLM E2E tests skipped (no OPENAI_API_KEY configured)"
-          elif [ "${{ needs.e2e-llm.result }}" == "failure" ]; then
+          elif [ "$RESULT" == "skipped" ] || [ -z "$RESULT" ]; then
+            echo "⏭️ LLM E2E tests skipped (job not scheduled or no OPENAI_API_KEY configured)"
+          elif [ "$RESULT" == "failure" ]; then
             echo "⚠️ LLM E2E tests failed"
             # Don't fail the entire workflow if LLM tests fail
             # They might fail due to API issues, rate limits, etc.
           else
-            echo "ℹ️ LLM E2E tests status: ${{ needs.e2e-llm.result }}"
+            echo "ℹ️ LLM E2E tests status: $RESULT"
           fi
