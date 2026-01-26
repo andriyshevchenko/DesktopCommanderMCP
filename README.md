@@ -40,6 +40,7 @@ Execute long-running terminal commands on your computer and manage processes thr
 
 - **Remote AI Control** - Use Desktop Commander from ChatGPT, Claude web, and other AI services via [Remote MCP](https://mcp.desktopcommander.app)
 - **Enhanced terminal commands with interactive process control**
+- **Sandboxed Python Code Execution** - Execute Python code with automatic package installation and filesystem restrictions
 - **Execute code in memory (Python, Node.js, R) without saving files**
 - **Instant data analysis - just ask to analyze CSV/JSON/Excel files**
 - **Native Excel file support** - Read, write, edit, and search Excel files (.xlsx, .xls, .xlsm) without external tools
@@ -449,6 +450,7 @@ The server provides a comprehensive set of tools organized into several categori
 | | `list_sessions` | List all active terminal sessions |
 | | `list_processes` | List all running processes with detailed information |
 | | `kill_process` | Terminate a running process by PID |
+| **Code Execution** | `execute_python_code` | Execute Python code in a sandboxed environment with automatic package installation and best-effort filesystem restrictions. Perfect for quick scripts and data analysis without interactive REPL. |
 | **Filesystem** | `read_file` | Read contents from local filesystem, URLs, Excel files (.xlsx, .xls, .xlsm), and PDFs with line/page-based pagination |
 | | `read_multiple_files` | Read multiple files simultaneously |
 | | `write_file` | Write file contents with options for rewrite or append mode. Supports Excel files (JSON 2D array format). For PDFs, use `write_pdf` |
@@ -467,6 +469,11 @@ The server provides a comprehensive set of tools organized into several categori
 | | `give_feedback_to_desktop_commander` | Open feedback form in browser to provide feedback to Desktop Commander Team |
 
 ### Quick Examples
+
+**Sandboxed Python Execution:**
+```
+"Execute this Python code with pandas installed" → Claude uses execute_python_code tool
+```
 
 **Data Analysis:**
 ```
@@ -516,6 +523,62 @@ The `edit_block` tool includes several enhancements for better reliability:
 5. **Comprehensive Logging**: All fuzzy searches are logged for analysis and debugging
 
 When a search fails, you'll see detailed information about the closest match found, including similarity percentage, execution time, and character differences. All these details are automatically logged for later analysis using the fuzzy search log tools.
+
+### Sandboxed Python Code Execution
+
+The `execute_python_code` tool provides a secure way to execute Python code with automatic package management and best-effort filesystem restrictions:
+
+**Features:**
+- Automatic package installation with pip (internet access required)
+- Best-effort filesystem access restrictions to target directory and temp directory
+- Packages installed to separate session-specific directory
+- Timeout protection for long-running scripts
+- Clean error handling and reporting
+
+**Use Cases:**
+1. Quick data analysis without setting up interactive REPL
+2. Running Python scripts with automatic dependency management
+3. Sandboxed code execution with limited filesystem access
+4. One-off calculations or data processing tasks
+
+**Examples:**
+
+Simple calculation:
+```javascript
+{
+  code: "print(2 + 2)",
+  timeout_ms: 5000
+}
+```
+
+File analysis with automatic package installation:
+```javascript
+{
+  code: `
+import pandas as pd
+df = pd.read_csv('data.csv')
+print(df.describe())
+print(f'Top customers: {df.groupby("customer").sum().sort_values("amount", ascending=False).head(5)}')
+`,
+  target_directory: "/path/to/data",
+  install_packages: ["pandas"],
+  timeout_ms: 30000
+}
+```
+
+**When to use `execute_python_code` vs `start_process("python3 -i")`:**
+- Use `execute_python_code` for: Quick scripts, automatic package management, sandboxed execution, stateless operations
+- Use `start_process("python3 -i")` for: Interactive REPL, multi-step workflows with state, debugging, iterative development
+
+**Security Notes:**
+
+⚠️ **Important**: The Python sandbox is a convenience feature, **not** a security boundary:
+- It is designed to encourage working within the specified `target_directory` and temp directory, but it does **not** comprehensively restrict all filesystem access
+- The sandbox wraps common high-level operations like `open()` and some `os.*` functions (e.g., `listdir`, `mkdir`, `remove`, `rename`, `chmod`), but **low-level file APIs** like `os.open`, `os.stat`, and file-descriptor operations are **not wrapped** and can bypass restrictions
+- Other Python modules (e.g., `subprocess`, `shutil`, advanced `pathlib` methods) can bypass any best-effort checks
+- The sandbox resolves symbolic links to prevent basic path traversal attacks
+- Network operations are allowed for package installation
+- **Recommendation**: Treat any Python run via this tool as having access to your user account's files and network. Only execute trusted Python code. For strong isolation, use the Docker setup below
 
 ### Docker Support
 
