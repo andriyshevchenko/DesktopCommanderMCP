@@ -125,12 +125,12 @@ There are several ways to install:
 
 **Option 1: Via Smithery**
 ```bash
-npx -y @smithery/cli install @wonderwhy-er/desktop-commander --client claude
+npx -y @smithery/cli install desktop-commander-enhanced --client claude
 ```
 
 **Option 2: Direct installation**
 ```bash
-npx @wonderwhy-er/desktop-commander setup
+npx desktop-commander-enhanced setup
 ```
 
 **Option 3: Manual configuration**
@@ -142,7 +142,7 @@ Add the MCP server to your claude_desktop_config.json (on Mac, found at ~/Librar
       "command": "npx",
       "args": [
         "-y",
-        "@wonderwhy-er/desktop-commander@latest"
+        "desktop-commander-enhanced@latest"
       ]
     }
   }

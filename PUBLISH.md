@@ -63,7 +63,7 @@ If you prefer to release manually or need to troubleshoot, follow these steps:
 ## Prerequisites
 
 - Node.js 18+ installed
-- NPM account with publish permissions to `@wonderwhy-er/desktop-commander`
+- NPM account with publish permissions to `desktop-commander-enhanced`
 - GitHub account with access to `wonderwhy-er/DesktopCommanderMCP`
 - `mcp-publisher` CLI tool installed: `brew install mcp-publisher`
 
@@ -128,7 +128,7 @@ git push origin vX.Y.Z
 npm publish
 
 # Verify publication
-npm view @wonderwhy-er/desktop-commander version
+npm view desktop-commander-enhanced version
 ```
 
 **Note**: Make sure you're logged into NPM with the correct account:
@@ -191,7 +191,7 @@ npm publish
 mcp-publisher publish
 
 # 6. Verify both publications
-npm view @wonderwhy-er/desktop-commander version
+npm view desktop-commander-enhanced version
 curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wonderwhy-er/desktop-commander" | jq '.servers[0].version'
 ```
 
@@ -219,7 +219,7 @@ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wo
 
 ## Registry Information
 
-- **NPM Package**: https://www.npmjs.com/package/@wonderwhy-er/desktop-commander
+- **NPM Package**: https://www.npmjs.com/package/desktop-commander-enhanced
 - **MCP Registry**: https://registry.modelcontextprotocol.io/
 - **Server ID**: `490703ba-12b3-48d8-81ef-056010280a9a`
 - **GitHub Repository**: https://github.com/wonderwhy-er/DesktopCommanderMCP

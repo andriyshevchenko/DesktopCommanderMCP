@@ -12,7 +12,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "@wonderwhy-er/desktop-commander",
+      "identifier": "desktop-commander-enhanced",
       "version": "0.3.0",
       "transport": {
         "type": "stdio"

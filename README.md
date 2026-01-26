@@ -1,9 +1,9 @@
 # Desktop Commander MCP
 ### Search, update, manage files and run terminal commands with AI
 
-[![npm downloads](https://img.shields.io/npm/dw/@wonderwhy-er/desktop-commander)](https://www.npmjs.com/package/@wonderwhy-er/desktop-commander)
+[![npm downloads](https://img.shields.io/npm/dw/desktop-commander-enhanced)](https://www.npmjs.com/package/desktop-commander-enhanced)
 [![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/wonderwhy-er/DesktopCommanderMCP)](https://archestra.ai/mcp-catalog/wonderwhy-er__desktopcommandermcp)
-[![smithery badge](https://smithery.ai/badge/@wonderwhy-er/desktop-commander)](https://smithery.ai/server/@wonderwhy-er/desktop-commander)
+[![smithery badge](https://smithery.ai/badge/desktop-commander-enhanced)](https://smithery.ai/server/desktop-commander-enhanced)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg)](https://www.buymeacoffee.com/wonderwhyer)
 
 
@@ -81,12 +81,12 @@ Desktop Commander offers multiple installation methods to fit different user nee
 ### Option 1: Install through npx ⭐ **Auto-Updates** **Requires Node.js**
 Just run this in terminal:
 ```
-npx @wonderwhy-er/desktop-commander@latest setup
+npx desktop-commander-enhanced@latest setup
 ```
 
 For debugging mode (allows Node.js inspector connection):
 ```
-npx @wonderwhy-er/desktop-commander@latest setup --debug
+npx desktop-commander-enhanced@latest setup --debug
 ```
 
 **Command line options during setup:**
@@ -97,7 +97,7 @@ Restart Claude if running.
 
 **✅ Auto-Updates:** Yes - automatically updates when you restart Claude  
 **🔄 Manual Update:** Run the setup command again  
-**🗑️ Uninstall:** Run `npx @wonderwhy-er/desktop-commander@latest remove`
+**🗑️ Uninstall:** Run `npx desktop-commander-enhanced@latest remove`
 
 ### Option 2: Using bash script installer (macOS) ⭐ **Auto-Updates** **Installs Node.js if needed**
 For macOS users, you can use our automated bash installer which will check your Node.js version, install it if needed, and automatically configure Desktop Commander:
@@ -108,13 +108,13 @@ This script handles all dependencies and configuration automatically for a seaml
 
 **✅ Auto-Updates:** Yes - requires manual updates  
 **🔄 Manual Update:** Re-run the bash installer command above  
-**🗑️ Uninstall:** Run `npx @wonderwhy-er/desktop-commander@latest remove`
+**🗑️ Uninstall:** Run `npx desktop-commander-enhanced@latest remove`
 
 ### Option 3: Installing via Smithery ⭐ **Auto-Updates** **Requires Node.js**
 
-To install Desktop Commander for Claude Desktop via [Smithery](https://smithery.ai/server/@wonderwhy-er/desktop-commander):
+To install Desktop Commander for Claude Desktop via [Smithery](https://smithery.ai/server/desktop-commander-enhanced):
 
-1. **Visit the Smithery page:** https://smithery.ai/server/@wonderwhy-er/desktop-commander
+1. **Visit the Smithery page:** https://smithery.ai/server/desktop-commander-enhanced
 2. **Login to Smithery** if you haven't already
 3. **Select your client** (Claude Desktop) on the right side
 4. **Install with the provided key** that appears after selecting your client
@@ -139,7 +139,7 @@ Add this entry to your claude_desktop_config.json:
       "command": "npx",
       "args": [
         "-y",
-        "@wonderwhy-er/desktop-commander@latest"
+        "desktop-commander-enhanced@latest"
       ]
     }
   }
@@ -149,7 +149,7 @@ Restart Claude if running.
 
 **✅ Auto-Updates:** Yes - automatically updates when you restart Claude  
 **🔄 Manual Update:** Run the setup command again  
-**🗑️ Uninstall:** Run `npx @wonderwhy-er/desktop-commander@latest remove` or  remove the "desktop-commander" entry from your claude_desktop_config.json file
+**🗑️ Uninstall:** Run `npx desktop-commander-enhanced@latest remove` or  remove the "desktop-commander" entry from your claude_desktop_config.json file
 
 ### ### Option 5: Checkout locally ❌ **Manual Updates** **Requires Node.js** ❌ **Manual Updates** **Requires Node.js**
 1. Clone and build:
@@ -168,7 +168,7 @@ The setup command will:
 
 **❌ Auto-Updates:** No - requires manual git updates  
 **🔄 Manual Update:** `cd DesktopCommanderMCP && git pull && npm run setup`  
-**🗑️ Uninstall:** Run `npx @wonderwhy-er/desktop-commander@latest remove` or remove the cloned directory and remove MCP server entry from Claude config
+**🗑️ Uninstall:** Run `npx desktop-commander-enhanced@latest remove` or remove the cloned directory and remove MCP server entry from Claude config
 
 ### Option 6: Docker Installation 🐳 ⭐ **Auto-Updates** **No Node.js Required**
 
@@ -362,7 +362,7 @@ The website provides complete instructions for:
 The easiest way to completely remove Desktop Commander:
 
 ```bash
-npx @wonderwhy-er/desktop-commander@latest remove
+npx desktop-commander-enhanced@latest remove
 ```
 
 This automatic uninstaller will:
@@ -392,7 +392,7 @@ If the automatic uninstaller doesn't work or you prefer manual removal:
   {
       "desktop-commander": {
         "command": "npx",
-        "args": ["@wonderwhy-er/desktop-commander@latest"]
+        "args": ["desktop-commander-enhanced@latest"]
       }
   }
   ```
@@ -770,7 +770,7 @@ npm run start:no-onboarding
       "command": "npx",
       "args": [
         "-y",
-        "@wonderwhy-er/desktop-commander@latest",
+        "desktop-commander-enhanced@latest",
         "--no-onboarding"
       ]
     }
@@ -814,7 +814,7 @@ If you need to debug the server, you can install it in debug mode:
 
 ```bash
 # Using npx
-npx @wonderwhy-er/desktop-commander@latest setup --debug
+npx desktop-commander-enhanced@latest setup --debug
 
 # Or if installed locally
 npm run setup:debug
