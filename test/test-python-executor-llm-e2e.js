@@ -378,7 +378,7 @@ async function testLLMDataProcessingWithFileWrite(client) {
     
     const response = await callOpenAIWithMCP(
       client,
-      `Read sales_data.csv, calculate total annual sales for each product using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely.`,
+      `Read sales_data.csv, calculate total annual sales for each product using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely. Use .items() instead of .iteritems() for compatibility with pandas 2.x.`,
       testDir
     );
     
@@ -421,6 +421,13 @@ async function testLLMDataProcessingWithFileWrite(client) {
         
         const output = result.content[0].text;
         logInfo(`Tool output:\n${output}`);
+        
+        // Check if execution failed
+        if (result.isError || output.includes('Execution failed')) {
+          logFail('Python code execution failed. This might be due to LLM generating incompatible code (e.g., using deprecated pandas methods like .iteritems())');
+          logInfo('Tip: The LLM should use .items() instead of .iteritems() for pandas 2.x compatibility');
+          return false;
+        }
         
         // Check if output file was created
         const outputPath = path.join(testDir, 'sales_summary.txt');
