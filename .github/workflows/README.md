@@ -119,14 +119,14 @@ Configuring this secret enables automatic LLM E2E tests on every push/PR.
 
 ## Workflow Dependencies
 
+Note: These workflows run independently in parallel - there are no automatic dependencies between them. Each workflow is triggered by the same events (push to main, pull requests).
+
 ```
 build.yml        (independent)
-  ↓
-test.yml         (requires build to pass)
-  ↓
-e2e.yml          (requires tests to pass)
+test.yml         (independent)
+e2e.yml          (independent)
   ├─ e2e-mcp     (always runs)
-  └─ e2e-llm     (manual trigger only)
+  └─ e2e-llm     (runs on push/PR when `OPENAI_API_KEY` is set; can also be triggered manually)
 ```
 
 ## Matrix Testing Strategy

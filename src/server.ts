@@ -1039,7 +1039,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 annotations: {
                     title: "Execute Python Code",
                     readOnlyHint: false,
-                    destructiveHint: false,
+                    destructiveHint: true,
                     openWorldHint: true,
                 },
             },

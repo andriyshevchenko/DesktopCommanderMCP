@@ -78,7 +78,14 @@ except PermissionError as e:
       target_directory: testDir
     });
     console.log("Result:", JSON.stringify(result, null, 2));
-    console.log("✓ Test 3 passed - Access correctly restricted\n");
+    
+    // Validate the result
+    const output = result.content[0].text;
+    if (output.includes('Correctly blocked') || output.includes('PermissionError')) {
+      console.log("✓ Test 3 passed - Access correctly restricted\n");
+    } else {
+      console.log("✗ Test 3 failed - Unauthorized access was not blocked\n");
+    }
     
     // Cleanup
     await fs.rm(testDir, { recursive: true, force: true });
@@ -101,7 +108,14 @@ except ImportError as e:
       install_packages: ['requests']
     });
     console.log("Result:", JSON.stringify(result, null, 2));
-    console.log("✓ Test 4 passed\n");
+    
+    // Validate the result
+    const output = result.content[0].text;
+    if (!result.isError && output.includes('Package installation successful!')) {
+      console.log("✓ Test 4 passed - Package installation successful\n");
+    } else {
+      console.log("✗ Test 4 failed - Package not properly installed or imported\n");
+    }
   } catch (error) {
     console.error("Note: Test 4 may fail if pip is not available or internet is not accessible");
     console.error("Error:", error);
@@ -120,7 +134,13 @@ print('Should not reach here')
       timeout_ms: 2000
     });
     console.log("Result:", JSON.stringify(result, null, 2));
-    console.log("✓ Test 5 passed - Timeout handled\n");
+    
+    // Validate the result
+    if (result.isError && result.content[0].text.includes('timed out')) {
+      console.log("✓ Test 5 passed - Timeout properly enforced\n");
+    } else {
+      console.log("✗ Test 5 failed - Timeout not properly handled\n");
+    }
   } catch (error) {
     console.error("✗ Test 5 failed:", error);
   }

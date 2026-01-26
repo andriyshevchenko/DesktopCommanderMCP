@@ -66,7 +66,10 @@ jobs:
   e2e-llm:
     name: E2E Tests (LLM Integration)
     runs-on: ubuntu-latest
-    # Run on push/PR if OPENAI_API_KEY is available, or on manual trigger
+    # Note: GitHub Actions does not allow checking secrets in job-level conditions.
+    # This job always runs on push/PR, and on manual workflow_dispatch it runs only
+    # when 'run_llm_tests' is set to true. The "Check for OpenAI API key" step
+    # decides whether the LLM tests actually execute based on OPENAI_API_KEY.
     if: |
       (github.event_name == 'push' || github.event_name == 'pull_request') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.run_llm_tests == 'true')
