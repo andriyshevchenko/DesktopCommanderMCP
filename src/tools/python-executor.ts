@@ -6,6 +6,12 @@ import { ExecutePythonCodeArgsSchema } from './schemas.js';
 import { ServerResult } from '../types.js';
 
 /**
+ * Grace period in milliseconds before sending SIGKILL after SIGTERM
+ * Allows processes time to clean up gracefully before forced termination
+ */
+const KILL_GRACE_PERIOD_MS = 5000;
+
+/**
  * Execute Python code in a sandboxed environment with limited filesystem access
  * and automatic package installation
  */
@@ -494,6 +500,18 @@ except Exception as e:
 
 /**
  * Build a minimal whitelisted environment to avoid leaking secrets
+ * 
+ * This function creates a minimal set of environment variables for Python subprocesses.
+ * By using a whitelist approach, we prevent secrets (API keys, tokens, etc.) that may
+ * exist in the server's process.env from being exposed to Python code or package install scripts.
+ * 
+ * Included variables:
+ * - PATH: Required for Python and pip to find executables
+ * - HOME: Used by Python for user site-packages and config files
+ * - TMPDIR/TEMP/TMP: Required for temporary file operations
+ * - Platform-specific: SYSTEMROOT/WINDIR/USERNAME (Windows) or USER/LOGNAME (Unix)
+ * 
+ * @returns A minimal environment object safe for use with Python subprocesses
  */
 function buildMinimalEnvironment(): Record<string, string> {
   return {
@@ -569,7 +587,7 @@ async function installPythonPackages(
           if (proc.exitCode === null && proc.signalCode === null) {
             proc.kill('SIGKILL');
           }
-        }, 5000); // 5 second grace period
+        }, KILL_GRACE_PERIOD_MS);
       }, timeout_ms);
     }
 
@@ -677,7 +695,7 @@ async function executePythonScript(
           if (proc.exitCode === null && proc.signalCode === null) {
             proc.kill('SIGKILL');
           }
-        }, 5000); // 5 second grace period
+        }, KILL_GRACE_PERIOD_MS);
       }, timeout_ms);
     }
 
