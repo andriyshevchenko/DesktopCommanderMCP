@@ -2,7 +2,7 @@
 ### Search, update, manage files and run terminal commands with AI
 
 [![npm downloads](https://img.shields.io/npm/dw/desktop-commander-enhanced)](https://www.npmjs.com/package/desktop-commander-enhanced)
-[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/wonderwhy-er/DesktopCommanderMCP)](https://archestra.ai/mcp-catalog/wonderwhy-er__desktopcommandermcp)
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/andriyshevchenko/DesktopCommanderMCP)](https://archestra.ai/mcp-catalog/andriyshevchenko__desktopcommandermcp)
 [![smithery badge](https://smithery.ai/badge/desktop-commander-enhanced)](https://smithery.ai/server/desktop-commander-enhanced)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg)](https://www.buymeacoffee.com/wonderwhyer)
 
@@ -102,7 +102,7 @@ Restart Claude if running.
 ### Option 2: Using bash script installer (macOS) ⭐ **Auto-Updates** **Installs Node.js if needed**
 For macOS users, you can use our automated bash installer which will check your Node.js version, install it if needed, and automatically configure Desktop Commander:
 ```
-curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install.sh | bash
 ```
 This script handles all dependencies and configuration automatically for a seamless setup experience.
 
@@ -154,7 +154,7 @@ Restart Claude if running.
 ### ### Option 5: Checkout locally ❌ **Manual Updates** **Requires Node.js** ❌ **Manual Updates** **Requires Node.js**
 1. Clone and build:
 ```bash
-git clone https://github.com/wonderwhy-er/DesktopCommanderMCP.git
+git clone https://github.com/andriyshevchenko/DesktopCommanderMCP.git
 cd DesktopCommanderMCP
 npm run setup
 ```
@@ -184,13 +184,13 @@ Perfect for users who want complete or partial isolation or don't have Node.js i
 
 **macOS/Linux:**
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.sh)
 ```
 
 **Windows PowerShell:**
 ```powershell
 # Download and run the installer (one-liner)
-iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'))
+iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'))
 ```
 
 The automated installer will:
@@ -285,41 +285,41 @@ If you prefer manual setup, add this to your claude_desktop_config.json:
 
 Check installation status:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.sh) --status
+bash <(curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.sh) --status
 ```
 
 Reset all persistent data (removes all installed tools and configs):
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.sh) --reset
+bash <(curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.sh) --reset
 ```
 
 **Windows PowerShell:**
 
 Check status:
 ```powershell
-$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -Status
+$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -Status
 ```
 
 Reset all data:
 ```powershell
-$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -Reset
+$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -Reset
 ```
 
 Show help:
 ```powershell
-$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -Help
+$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -Help
 ```
 
 Verbose output:
 ```powershell
-$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -VerboseOutput
+$script = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.ps1'); & ([ScriptBlock]::Create("$script")) -VerboseOutput
 ```  
 
 #### Troubleshooting Docker Installation
 If you broke the Docker container or need a fresh start:
 ```bash
 # Reset and reinstall from scratch
-bash <(curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.sh) --reset && bash <(curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install-docker.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.sh) --reset && bash <(curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install-docker.sh)
 ```
 This will completely reset your persistent environment and reinstall everything fresh with exception of not touching mounted folders
 
