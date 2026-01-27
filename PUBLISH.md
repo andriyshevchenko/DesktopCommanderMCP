@@ -64,7 +64,7 @@ If you prefer to release manually or need to troubleshoot, follow these steps:
 
 - Node.js 18+ installed
 - NPM account with publish permissions to `desktop-commander-enhanced`
-- GitHub account with access to `wonderwhy-er/DesktopCommanderMCP`
+- GitHub account with access to `andriyshevchenko/DesktopCommanderMCP`
 - `mcp-publisher` CLI tool installed: `brew install mcp-publisher`
 
 ## Publishing Process
@@ -148,12 +148,12 @@ mcp-publisher login github
 mcp-publisher publish
 
 # Verify publication
-curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wonderwhy-er/desktop-commander" | jq '.servers[0].version'
+curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.andriyshevchenko/desktop-commander-enhanced" | jq '.servers[0].version'
 ```
 
 ### 6. Create GitHub Release (Optional but Recommended)
 
-1. Go to https://github.com/wonderwhy-er/DesktopCommanderMCP/releases
+1. Go to https://github.com/andriyshevchenko/DesktopCommanderMCP/releases
 2. Click "Create a new release"
 3. Select the tag you just created (`vX.Y.Z`)
 4. Fill in release notes with:
@@ -192,7 +192,7 @@ mcp-publisher publish
 
 # 6. Verify both publications
 npm view desktop-commander-enhanced version
-curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wonderwhy-er/desktop-commander" | jq '.servers[0].version'
+curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.andriyshevchenko/desktop-commander-enhanced" | jq '.servers[0].version'
 ```
 
 ## Troubleshooting
@@ -200,7 +200,7 @@ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wo
 ### NPM Publishing Issues
 
 - **Authentication Error**: Run `npm login` and verify with `npm whoami`
-- **Permission Error**: Ensure you have publish rights to the `@wonderwhy-er` scope
+- **Permission Error**: Ensure you have publish rights to the `desktop-commander-enhanced` package
 - **Version Already Exists**: You cannot republish the same version. Bump the version again.
 
 ### MCP Registry Issues
@@ -222,7 +222,7 @@ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wo
 - **NPM Package**: https://www.npmjs.com/package/desktop-commander-enhanced
 - **MCP Registry**: https://registry.modelcontextprotocol.io/
 - **Server ID**: `490703ba-12b3-48d8-81ef-056010280a9a`
-- **GitHub Repository**: https://github.com/wonderwhy-er/DesktopCommanderMCP
+- **GitHub Repository**: https://github.com/andriyshevchenko/DesktopCommanderMCP
 
 ## Version Sync Script Details
 
