@@ -27,7 +27,7 @@ This directory contains CI/CD workflows for the Desktop Commander MCP project.
 **Purpose**: Run unit tests across multiple Node.js and Python versions
 
 **What it does**:
-- Matrix testing: Node.js (18.x, 20.x) × Python (3.9, 3.10, 3.11, 3.12)
+- Matrix testing: Node.js (18.x, 20.x) × Python (3.9, 3.12)
 - Verifies Python installation and pip availability
 - Runs Python executor unit tests
 - Runs full test suite
@@ -50,7 +50,7 @@ The `execute_python_code` tool requires Python to be installed. Testing across m
 #### 3a. E2E MCP Protocol Tests (`e2e-mcp`)
 - **Always runs** on push/PR
 - Tests real MCP Client/Server communication
-- Matrix: Node.js (18.x, 20.x) × Python (3.9, 3.10, 3.11, 3.12)
+- Matrix: Node.js (18.x, 20.x) × Python (3.9, 3.12)
 - Timeout: 10 minutes
 - Tests tool registration, execution, sandboxing
 - Network tests (package installation) are currently skipped in CI
@@ -137,10 +137,10 @@ e2e.yml          (independent)
 - **20.x**: Current LTS
 
 ### Python Versions
-- **3.9**: Older stable version
-- **3.10-3.12**: Current stable versions
+- **3.9**: Oldest supported version (CI tested)
+- **3.12**: Newest supported version (CI tested)
 
-This ensures the `execute_python_code` tool works with commonly used Python versions.
+This ensures the `execute_python_code` tool works with commonly used Python versions, while keeping CI fast by testing representative oldest and newest supported releases.
 
 ## Troubleshooting
 

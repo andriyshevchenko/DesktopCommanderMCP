@@ -264,13 +264,16 @@ def _setup_sandbox():
         return _original_replace(src, dst)
     
     def _safe_symlink(src, dst):
-        """Wrapped symlink that checks destination path.
+        """Wrapped symlink that checks both source and destination paths.
         
         os.symlink(src, dst) creates a symlink at dst pointing to src.
-        We only check dst (where the symlink is created) is within allowed directories.
+        We ensure both src (the target) and dst (where the symlink is created)
+        are within allowed directories.
         """
+        if not _is_path_allowed(src):
+            raise PermissionError(f"Access denied: source {src} is outside allowed directories")
         if not _is_path_allowed(dst):
-            raise PermissionError(f"Access denied: {dst} is outside allowed directories")
+            raise PermissionError(f"Access denied: destination {dst} is outside allowed directories")
         return _original_symlink(src, dst)
     
     def _safe_link(src, dst):
@@ -422,8 +425,10 @@ def _setup_sandbox():
             
             def symlink_to(self, target):
                 # symlink_to creates a symlink at self pointing to target
-                # We only need to check that self (where symlink is created) is allowed
+                # Both the symlink location (self) and the target must be within allowed directories
                 self._check_access()
+                if not _is_path_allowed(str(target)):
+                    raise PermissionError(f"Access denied: {target} is outside allowed directories")
                 return super().symlink_to(target)
             
             def link_to(self, target):
