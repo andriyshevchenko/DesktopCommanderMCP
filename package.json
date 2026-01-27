@@ -13,6 +13,7 @@
   },
   "bin": {
     "desktop-commander": "dist/index.js",
+    "desktop-commander-enhanced": "dist/index.js",
     "setup": "dist/setup-claude-server.js",
     "remove": "dist/uninstall-claude-server.js"
   },
