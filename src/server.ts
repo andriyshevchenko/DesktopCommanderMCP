@@ -47,11 +47,13 @@ import {
     GetPromptsArgsSchema,
     GetRecentToolCallsArgsSchema,
     WritePdfArgsSchema,
+    ExecutePythonCodeArgsSchema,
 } from './tools/schemas.js';
 import { getConfig, setConfigValue } from './tools/config.js';
 import { getUsageStats } from './tools/usage.js';
 import { giveFeedbackToDesktopCommander } from './tools/feedback.js';
 import { getPrompts } from './tools/prompts.js';
+import { executePythonCode } from './tools/python-executor.js';
 import { trackToolCall } from './utils/trackTools.js';
 import { usageTracker } from './utils/usageTracker.js';
 import { processDockerPrompt } from './utils/dockerPrompt.js';
@@ -985,6 +987,63 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
+                name: "execute_python_code",
+                description: `
+                        Execute Python code in a sandboxed environment with limited filesystem access.
+                        
+                        FEATURES:
+                        - Automatic package installation with pip (internet access required)
+                        - Filesystem access restrictions (best-effort) to target directory and temp directory
+                        - Packages installed to separate session-specific directory
+                        - Timeout protection for long-running scripts
+                        
+                        SECURITY:
+                        The code runs with best-effort filesystem access restrictions:
+                        - Python's open() and some os.* functions (e.g., listdir, mkdir, remove, rename, chmod) are wrapped to restrict access to target_directory and temp directory
+                        - Symbolic links are resolved to prevent path traversal attacks
+                        - Unauthorized access attempts raise PermissionError
+                        - LIMITATION: Low-level file APIs (os.open, os.stat, etc.) and advanced modules (subprocess, etc.) are NOT wrapped and can bypass restrictions
+                        - RECOMMENDATION: Only execute trusted Python code; use Docker for complete isolation
+                        
+                        PARAMETERS:
+                        - code: Python code to execute (required)
+                        - target_directory: Working directory with read/write access (optional; if omitted, a new isolated temporary directory is used—pass this explicitly to work with existing files)
+                        - timeout_ms: Execution timeout in milliseconds (optional, default: 30000)
+                        - install_packages: Array of pip package names to install before execution (optional)
+                        
+                        EXAMPLES:
+                        1. Simple calculation:
+                           code: "print(2 + 2)"
+                        
+                        2. File analysis with pandas:
+                           code: "import pandas as pd\\ndf = pd.read_csv('data.csv')\\nprint(df.head())"
+                           target_directory: "/path/to/data"
+                           install_packages: ["pandas"]
+                        
+                        3. Data processing with multiple packages:
+                           code: "import numpy as np\\nimport matplotlib.pyplot as plt\\nx = np.linspace(0, 10, 100)\\nprint(f'Generated {len(x)} points')"
+                           install_packages: ["numpy", "matplotlib"]
+                        
+                        COMPARISON WITH start_process:
+                        - Use execute_python_code for: Quick scripts, data analysis, automatic package management, sandboxed execution
+                        - Use start_process("python3 -i") for: Interactive REPL, multi-step workflows, debugging, state preservation
+                        
+                        LIMITATIONS:
+                        - Requires Python 3 to be installed on the system
+                        - Code execution is stateless (each call is independent)
+                        - Network operations are allowed but filesystem is restricted
+                        - No interactive input during execution
+                        
+                        ${CMD_PREFIX_DESCRIPTION}`,
+                inputSchema: zodToJsonSchema(ExecutePythonCodeArgsSchema),
+                annotations: {
+                    title: "Execute Python Code",
+                    readOnlyHint: false,
+                    destructiveHint: true,
+                    openWorldHint: true,
+                },
+            },
+            {
                 name: "get_usage_stats",
                 description: `
                         Get usage statistics for debugging and analysis.
@@ -1292,6 +1351,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
 
             case "kill_process":
                 result = await handlers.handleKillProcess(args);
+                break;
+
+            case "execute_python_code":
+                result = await executePythonCode(args);
                 break;
 
             // Note: REPL functionality removed in favor of using general terminal commands
