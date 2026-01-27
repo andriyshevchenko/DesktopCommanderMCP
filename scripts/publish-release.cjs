@@ -145,7 +145,7 @@ function updateVersionFiles(newVersion) {
     serverJson.version = newVersion;
     if (serverJson.packages && serverJson.packages.length > 0) {
         serverJson.packages.forEach(p => {
-            if (p.registryType === 'npm' && p.identifier === '@wonderwhy-er/desktop-commander') {
+            if (p.registryType === 'npm' && p.identifier === 'desktop-commander-enhanced') {
                 p.version = newVersion;
             }
         });
@@ -808,8 +808,8 @@ Automated release commit with version bump from ${currentVersion} to ${newVersio
                 // Verify NPM publication
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 const viewCmd = options.alpha 
-                    ? 'npm view @wonderwhy-er/desktop-commander dist-tags.alpha'
-                    : 'npm view @wonderwhy-er/desktop-commander version';
+                    ? 'npm view desktop-commander-enhanced dist-tags.alpha'
+                    : 'npm view desktop-commander-enhanced version';
                 const npmVersion = execSilent(viewCmd, { ignoreError: true }).trim();
                 if (npmVersion === newVersion) {
                     printSuccess(`NPM publication verified: v${npmVersion}${options.alpha ? ' (alpha)' : ''}`);
@@ -895,7 +895,7 @@ Automated release commit with version bump from ${currentVersion} to ${newVersio
                 // Verify MCP Registry publication
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 try {
-                    const mcpResponse = execSilent('curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wonderwhy-er/desktop-commander"');
+                    const mcpResponse = execSilent('curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.andriyshevchenko/desktop-commander-enhanced"');
                     const mcpData = JSON.parse(mcpResponse);
                     const mcpVersion = mcpData.servers?.[0]?.version || 'unknown';
                     
@@ -925,12 +925,12 @@ Automated release commit with version bump from ${currentVersion} to ${newVersio
         console.log('╚══════════════════════════════════════════════════════════╝');
         console.log('');
         printSuccess(`Version: ${newVersion}`);
-        printSuccess('NPM: https://www.npmjs.com/package/@wonderwhy-er/desktop-commander');
+        printSuccess('NPM: https://www.npmjs.com/package/desktop-commander-enhanced');
         printSuccess('MCP Registry: https://registry.modelcontextprotocol.io/');
-        printSuccess(`GitHub Tag: https://github.com/wonderwhy-er/DesktopCommanderMCP/releases/tag/${tagName}`);
+        printSuccess(`GitHub Tag: https://github.com/andriyshevchenko/DesktopCommanderMCP/releases/tag/${tagName}`);
         console.log('');
         console.log('Next steps:');
-        console.log(`  1. Create GitHub release at: https://github.com/wonderwhy-er/DesktopCommanderMCP/releases/new?tag=${tagName}`);
+        console.log(`  1. Create GitHub release at: https://github.com/andriyshevchenko/DesktopCommanderMCP/releases/new?tag=${tagName}`);
         console.log('  2. Add release notes with features and fixes');
         console.log('  3. Announce on Discord');
         console.log('');

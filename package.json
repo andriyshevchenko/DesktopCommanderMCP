@@ -2,11 +2,11 @@
   "name": "desktop-commander-enhanced",
   "version": "0.3.0",
   "description": "MCP server for terminal operations and file editing",
-  "mcpName": "io.github.wonderwhy-er/desktop-commander",
+  "mcpName": "io.github.andriyshevchenko/desktop-commander-enhanced",
   "license": "MIT",
   "author": "Eduards Ruzga",
-  "homepage": "https://github.com/wonderwhy-er/DesktopCommanderMCP",
-  "bugs": "https://github.com/wonderwhy-er/DesktopCommanderMCP/issues",
+  "homepage": "https://github.com/andriyshevchenko/DesktopCommanderMCP",
+  "bugs": "https://github.com/andriyshevchenko/DesktopCommanderMCP/issues",
   "type": "module",
   "engines": {
     "node": ">=18.0.0"

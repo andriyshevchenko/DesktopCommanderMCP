@@ -42,7 +42,7 @@ fi
 
 # Run the setup
 echo "Running setup command..."
-if npx @wonderwhy-er/desktop-commander@latest setup; then
+if npx desktop-commander-enhanced@latest setup; then
     print_success "Setup completed successfully!"
 else
     print_error "Setup failed. Check the console output above for more information."
