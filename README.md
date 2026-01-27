@@ -9,8 +9,8 @@
 
 [![Discord](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kQ27sNnZr7)
 
-
 Work with code and text, run processes, and automate tasks, going far beyond other AI editors - while using host client subscriptions instead of API token costs.
+This fork exists primarily to add **sandboxed Python execution** with automatic package installation and filesystem restrictions. It is published to npm as **`desktop-commander-enhanced`** under my namespace.
 
 <a href="https://glama.ai/mcp/servers/zempur9oh4">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/zempur9oh4/badge" alt="Desktop Commander MCP" />
@@ -74,6 +74,8 @@ Execute long-running terminal commands on your computer and manage processes thr
 
 ## How to install
 
+> **Package name:** This fork is published on npm as **`desktop-commander-enhanced`**.
+
 Desktop Commander offers multiple installation methods to fit different user needs and technical requirements.
 
 > **📋 Update & Uninstall Information:** Before choosing an installation option, note that **only Options 1, 2, 3, and 6 have automatic updates**. Options 4 and 5 require manual updates. See the sections below for update and uninstall instructions for each option.
@@ -102,7 +104,7 @@ Restart Claude if running.
 ### Option 2: Using bash script installer (macOS) ⭐ **Auto-Updates** **Installs Node.js if needed**
 For macOS users, you can use our automated bash installer which will check your Node.js version, install it if needed, and automatically configure Desktop Commander:
 ```
-curl -fsSL https://raw.githubusercontent.com/wonderwhy-er/DesktopCommanderMCP/refs/heads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/andriyshevchenko/DesktopCommanderMCP/refs/heads/main/install.sh | bash
 ```
 This script handles all dependencies and configuration automatically for a seamless setup experience.
 
@@ -524,7 +526,7 @@ The `edit_block` tool includes several enhancements for better reliability:
 
 When a search fails, you'll see detailed information about the closest match found, including similarity percentage, execution time, and character differences. All these details are automatically logged for later analysis using the fuzzy search log tools.
 
-### Sandboxed Python Code Execution
+### Sandboxed Python Code Execution (flagship feature of this fork)
 
 The `execute_python_code` tool provides a secure way to execute Python code with automatic package management and best-effort filesystem restrictions:
 
