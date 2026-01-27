@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.wonderwhy-er/desktop-commander",
+  "name": "io.github.andriyshevchenko/desktop-commander",
   "title": "Desktop Commander",
   "description": "MCP server for terminal commands, file operations, and process management",
   "repository": {
