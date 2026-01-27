@@ -200,7 +200,7 @@ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wo
 ### NPM Publishing Issues
 
 - **Authentication Error**: Run `npm login` and verify with `npm whoami`
-- **Permission Error**: Ensure you have publish rights to the `@wonderwhy-er` scope
+- **Permission Error**: Ensure you have publish rights to the `desktop-commander-enhanced` package
 - **Version Already Exists**: You cannot republish the same version. Bump the version again.
 
 ### MCP Registry Issues
