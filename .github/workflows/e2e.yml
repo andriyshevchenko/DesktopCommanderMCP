@@ -59,6 +59,8 @@ jobs:
       
       - name: Run MCP E2E tests
         run: node test/test-python-executor-e2e.js
+        # 10-minute timeout is conservative given that individual Python executions
+        # timeout at 30-90 seconds. Provides buffer for CI environment variability.
         timeout-minutes: 10
       
       - name: Test results
@@ -84,8 +86,10 @@ jobs:
       
       - name: Check for OpenAI API key
         id: check_key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+          if [ -z "$OPENAI_API_KEY" ]; then
             echo "⚠️ OPENAI_API_KEY secret not configured"
             echo "LLM E2E tests will be skipped"
             echo "Configure the OPENAI_API_KEY secret in repository settings to enable LLM tests"
@@ -123,6 +127,9 @@ jobs:
         run: node test/test-python-executor-llm-e2e.js
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        # 15-minute timeout accounts for LLM API calls and multiple test iterations.
+        # Individual Python executions timeout at 30-90 seconds, but LLM response
+        # times and multiple test cases require additional time.
         timeout-minutes: 15
       
       - name: Test results

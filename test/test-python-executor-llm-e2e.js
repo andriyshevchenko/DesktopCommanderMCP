@@ -88,7 +88,13 @@ async function createMcpClient() {
 /**
  * Parse JSON with fallback for OpenAI's invalid escape sequences
  * OpenAI sometimes returns Python code with \' which is invalid in JSON.
- * Note: Currently handles only \' sequences. If other escape issues arise,
+ * 
+ * Note: This replacement is done at the JSON level (before parsing) and should
+ * not affect legitimate escaped quotes within Python string literals that are
+ * properly JSON-encoded. The replacement only occurs if standard JSON parsing fails,
+ * indicating a malformed JSON response from OpenAI.
+ * 
+ * Currently handles only \' sequences. If other escape issues arise,
  * this function can be extended to handle additional patterns.
  */
 function parseToolArguments(jsonString) {
@@ -402,7 +408,7 @@ async function testLLMDataProcessingWithFileWrite(client) {
     
     const response = await callOpenAIWithMCP(
       client,
-      `Read sales_data.csv which has columns: product, sales_q1, sales_q2, sales_q3, sales_q4. Calculate total annual sales for each product by summing all quarterly sales columns using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely. Use .items() instead of .iteritems() for compatibility with pandas 2.x.`,
+      `Read sales_data.csv which has columns: product, sales_q1, sales_q2, sales_q3, sales_q4. Calculate total annual sales for each product by summing all quarterly sales columns using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely.`,
       testDir
     );
     
