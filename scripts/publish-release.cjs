@@ -6,7 +6,7 @@
  * This script handles the entire release process:
  * 1. Version bump
  * 2. Build project and MCPB bundle
- * 3. Commit and tag
+ * 3. Commit and push to main
  * 4. Publish to NPM
  * 5. Publish to MCP Registry
  * 6. Verify publications
@@ -252,7 +252,7 @@ function showHelp() {
     console.log('  --skip-bump     Skip version bumping');
     console.log('  --skip-build    Skip building (if tests also skipped)');
     console.log('  --skip-mcpb     Skip building MCPB bundle');
-    console.log('  --skip-git      Skip git commit and tag');
+    console.log('  --skip-git      Skip git commit and push');
     console.log('  --skip-npm      Skip NPM publishing');
     console.log('  --skip-mcp      Skip MCP Registry publishing');
     console.log('  --npm-only      Only publish to NPM (skip MCPB, git, MCP Registry)');
@@ -716,10 +716,10 @@ async function publishRelease() {
         }
         console.log('');
 
-        // Step 4: Commit and tag
+        // Step 4: Commit changes (no tagging)
         const shouldSkipGit = options.skipGit || isStepComplete(state, 'git');
         if (!shouldSkipGit) {
-            printStep('Step 4/6: Creating git commit and tag...');
+            printStep('Step 4/6: Creating git commit...');
         
             // Check if there are changes to commit
             const gitStatus = execSilent('git status --porcelain', { ignoreError: true });
@@ -744,40 +744,20 @@ Automated release commit with version bump from ${currentVersion} to ${newVersio
                 }
             }
 
-            // Create and push tag
-            const tagName = `v${newVersion}`;
-            
+            // Push to main (no tagging)
             if (options.dryRun) {
-                printWarning(`Would create tag: ${tagName}`);
-                printWarning(`Would push to origin: main and ${tagName}`);
+                printWarning(`Would push to origin: main`);
             } else {
-                // Check if tag already exists locally
-                const existingTag = execSilent(`git tag -l "${tagName}"`, { ignoreError: true }).trim();
-                if (existingTag === tagName) {
-                    printWarning(`Tag ${tagName} already exists locally`);
-                } else {
-                    exec(`git tag ${tagName}`);
-                    printSuccess(`Tag ${tagName} created`);
-                }
-                
                 // Push main (ignore error if already up to date)
                 exec('git push origin main', { ignoreError: true });
-                
-                // Push tag (check if already on remote first)
-                const remoteTag = execSilent(`git ls-remote --tags origin refs/tags/${tagName}`, { ignoreError: true }).trim();
-                if (remoteTag) {
-                    printWarning(`Tag ${tagName} already exists on remote`);
-                } else {
-                    exec(`git push origin ${tagName}`);
-                    printSuccess(`Tag ${tagName} pushed to remote`);
-                }
+                printSuccess('Changes pushed to main');
             }
             
             markStepComplete(state, 'git');
         } else if (isStepComplete(state, 'git')) {
-            printInfo('Step 4/6: Git commit and tag already completed ✓');
+            printInfo('Step 4/6: Git commit already completed ✓');
         } else {
-            printWarning('Step 4/6: Git commit and tag skipped (manual override)');
+            printWarning('Step 4/6: Git commit skipped (manual override)');
         }
         console.log('');
 
@@ -919,7 +899,6 @@ Automated release commit with version bump from ${currentVersion} to ${newVersio
         clearState();
 
         // Success summary
-        const tagName = `v${newVersion}`;
         console.log('╔══════════════════════════════════════════════════════════╗');
         console.log('║                  🎉 Release Complete! 🎉                 ║');
         console.log('╚══════════════════════════════════════════════════════════╝');
@@ -927,12 +906,11 @@ Automated release commit with version bump from ${currentVersion} to ${newVersio
         printSuccess(`Version: ${newVersion}`);
         printSuccess('NPM: https://www.npmjs.com/package/desktop-commander-enhanced');
         printSuccess('MCP Registry: https://registry.modelcontextprotocol.io/');
-        printSuccess(`GitHub Tag: https://github.com/andriyshevchenko/DesktopCommanderMCP/releases/tag/${tagName}`);
+        printSuccess('GitHub: https://github.com/andriyshevchenko/DesktopCommanderMCP');
         console.log('');
         console.log('Next steps:');
-        console.log(`  1. Create GitHub release at: https://github.com/andriyshevchenko/DesktopCommanderMCP/releases/new?tag=${tagName}`);
-        console.log('  2. Add release notes with features and fixes');
-        console.log('  3. Announce on Discord');
+        console.log('  1. Verify installation works with the new version');
+        console.log('  2. Announce on Discord');
         console.log('');
 
         if (options.dryRun) {
