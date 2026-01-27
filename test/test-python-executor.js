@@ -1,4 +1,4 @@
-import { executePythonCode } from '../dist/tools/python-executor.js';
+import { executePythonCode, TIMEOUT_ERROR_PREFIX } from '../dist/tools/python-executor.js';
 import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
@@ -188,7 +188,7 @@ print('Should not reach here')
     
     // Validate the result
     if (result.content && result.content[0] && result.content[0].text) {
-      if (result.isError && result.content[0].text.includes('timed out')) {
+      if (result.isError && result.content[0].text.includes(TIMEOUT_ERROR_PREFIX)) {
         console.log("✓ Test 5 passed - Timeout properly enforced\n");
       } else {
         console.log("✗ Test 5 failed - Timeout not properly handled\n");

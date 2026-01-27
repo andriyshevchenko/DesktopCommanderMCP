@@ -12,6 +12,12 @@ import { ServerResult } from '../types.js';
 const KILL_GRACE_PERIOD_MS = 5000;
 
 /**
+ * Error message prefix for timeout errors
+ * Used for consistent error reporting and easier testing
+ */
+export const TIMEOUT_ERROR_PREFIX = 'Execution timed out after';
+
+/**
  * Execute Python code in a sandboxed environment with limited filesystem access
  * and automatic package installation
  */
@@ -315,6 +321,12 @@ def _setup_sandbox():
     if _original_chown is not None:
         os.chown = _safe_chown
     
+    # NOTE: Lower-level operations like os.open(), os.stat(), os.lstat(), os.access(),
+    # os.scandir(), and os.walk() are NOT wrapped by this sandbox. These functions
+    # could potentially be used to bypass the sandbox restrictions. The sandbox wraps
+    # the most commonly used high-level filesystem operations to provide a reasonable
+    # level of protection for typical Python code execution scenarios.
+    
     # Wrap shutil functions that perform filesystem operations
     try:
         import shutil
@@ -442,6 +454,30 @@ def _setup_sandbox():
             def chmod(self, mode):
                 self._check_access()
                 return super().chmod(mode)
+            
+            def open(self, *args, **kwargs):
+                self._check_access()
+                return _safe_open(str(self), *args, **kwargs)
+            
+            def read_text(self, *args, **kwargs):
+                self._check_access()
+                return super().read_text(*args, **kwargs)
+            
+            def read_bytes(self):
+                self._check_access()
+                return super().read_bytes()
+            
+            def iterdir(self):
+                self._check_access()
+                return super().iterdir()
+            
+            def glob(self, pattern):
+                self._check_access()
+                return super().glob(pattern)
+            
+            def rglob(self, pattern):
+                self._check_access()
+                return super().rglob(pattern)
         
         # Replace pathlib.Path in sys.modules
         pathlib.Path = _SafePath
@@ -513,21 +549,21 @@ os.chdir('${escapedTargetDir}')
 import base64 as _py_executor_base64
 
 try:
-    _user_code_bytes = _py_executor_base64.b64decode('${Buffer.from(userCode, 'utf8').toString('base64')}')
-    _user_code = _user_code_bytes.decode('utf-8')
+    __py_executor_internal_user_code_bytes__ = _py_executor_base64.b64decode('${Buffer.from(userCode, 'utf8').toString('base64')}')
+    __py_executor_internal_user_code__ = __py_executor_internal_user_code_bytes__.decode('utf-8')
     
     # Build a restricted globals dictionary for user code execution
     # This isolates user code from internal wrapper variables and provides a clean namespace
     # Note: The sandboxed open, os functions, etc. are already in builtins and os module
     # after _setup_sandbox() ran, so we just need to provide a minimal clean namespace
-    _exec_globals = {
+    __py_executor_internal_exec_globals__ = {
         '__builtins__': __builtins__,
         'os': os,
         'sys': sys,
     }
-    _exec_locals = {}
+    __py_executor_internal_exec_locals__ = {}
     
-    exec(_user_code, _exec_globals, _exec_locals)
+    exec(__py_executor_internal_user_code__, __py_executor_internal_exec_globals__, __py_executor_internal_exec_locals__)
 except Exception as e:
     import traceback
     print(f"Error executing code: {e}", file=sys.stderr)
@@ -551,6 +587,11 @@ except Exception as e:
  * - Platform-specific (Unix): USER, LOGNAME, LANG, LC_ALL
  * 
  * Empty variables are filtered out to avoid confusion in Python code.
+ * 
+ * Note: PYTHONPATH is intentionally NOT included here. It is managed separately in
+ * executePythonScript() where it's explicitly set to control the Python module search path
+ * for security reasons. This prevents any potentially malicious PYTHONPATH settings from
+ * the parent environment from affecting the sandboxed execution.
  * 
  * @returns A minimal environment object safe for use with Python subprocesses
  */
@@ -781,7 +822,7 @@ async function executePythonScript(
         resolve({
           content: [{
             type: "text",
-            text: `Execution timed out after ${timeout_ms}ms\n\nPartial output:\n${stdout}\n${stderr}`
+            text: `${TIMEOUT_ERROR_PREFIX} ${timeout_ms}ms\n\nPartial output:\n${stdout}\n${stderr}`
           }],
           isError: true
         });
