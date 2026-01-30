@@ -230,7 +230,7 @@ export const ExecutePythonCodeArgsSchema = z.object({
   timeout_ms: z.union([
     z.number().int().min(1000).max(300000),
     z.literal("auto")  // Auto-detect: 120s with packages, 30s without
-  ]).optional().default(30000),
+  ]).optional().default("auto"),
   install_packages: z
     .array(
       z

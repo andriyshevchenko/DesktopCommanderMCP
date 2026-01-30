@@ -33,13 +33,12 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
   const { code, target_directory, install_packages, workspace, return_format } = parsed.data;
   
   // Auto-detect timeout: 120s if installing packages, 30s otherwise
+  // If user explicitly sets a numeric timeout, always respect it
   let timeout_ms: number;
-  if (parsed.data.timeout_ms === "auto" || (install_packages && install_packages.length > 0 && parsed.data.timeout_ms === 30000)) {
+  if (parsed.data.timeout_ms === "auto") {
     timeout_ms = install_packages && install_packages.length > 0 ? 120000 : 30000;
-  } else if (typeof parsed.data.timeout_ms === "number") {
-    timeout_ms = parsed.data.timeout_ms;
   } else {
-    timeout_ms = 30000;
+    timeout_ms = parsed.data.timeout_ms;
   }
 
   // Create a temporary directory for this execution
@@ -131,11 +130,11 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     }
 
     // Execute the script
-    const result = await executePythonScript(scriptPath, packagesDir, timeout_ms, resolvedTargetDir);
+    const result = await executePythonScript(scriptPath, packagesDir, timeout_ms);
 
     // Format result based on return_format
     let finalResult: ServerResult;
-    if (return_format === "detailed" && !result.isError) {
+    if (return_format === "detailed" && !result.isError && result.content && result.content.length > 0) {
       // Add detailed information including workspace path
       const detailedText = result.content[0].text + 
         `\n\n--- Execution Details ---` +
@@ -839,8 +838,7 @@ async function installPythonPackages(
 async function executePythonScript(
   scriptPath: string,
   packagesDir: string,
-  timeout_ms: number,
-  workspaceDir: string
+  timeout_ms: number
 ): Promise<ServerResult> {
   const pythonCmd = await findPythonCommand();
   if (!pythonCmd) {

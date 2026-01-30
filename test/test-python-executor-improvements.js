@@ -32,6 +32,7 @@ async function testPythonExecutorImprovements() {
 
   // Test 2: Persistent workspace directory
   console.log("Test 2: Persistent workspace directory");
+  const persistentWorkspace = path.join(os.homedir(), '.desktop-commander', 'python-workspace');
   try {
     const result1 = await executePythonCode({
       code: `
@@ -65,6 +66,14 @@ except FileNotFoundError:
     } else {
       console.log("✗ Test 2 failed - Workspace persistence not working\n");
       failedTests++;
+    }
+
+    // Cleanup test file
+    try {
+      const testFile = path.join(persistentWorkspace, 'persistent_test.txt');
+      await fs.unlink(testFile);
+    } catch (cleanupError) {
+      console.warn("Warning: Failed to cleanup test file:", cleanupError);
     }
   } catch (error) {
     console.error("✗ Test 2 failed:", error);
