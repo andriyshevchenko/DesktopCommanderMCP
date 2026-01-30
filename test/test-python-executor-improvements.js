@@ -9,14 +9,13 @@ async function testPythonExecutorImprovements() {
   let failedTests = 0;
   const totalTests = 4;
 
-  // Test 1: Auto timeout detection with packages
-  console.log("Test 1: Auto timeout detection (should default to 120s with packages)");
+  // Test 1: Auto timeout detection without packages
+  console.log("Test 1: Auto timeout detection (should default to 30s without packages)");
   try {
-    // This test doesn't actually install packages, but checks that the timeout isn't failing immediately
+    // This test checks that the automatic timeout (default 30s) isn't failing immediately
     const result = await executePythonCode({
       code: "print('Testing auto timeout')",
-      timeout_ms: "auto",
-      install_packages: []  // Empty array to trigger auto timeout logic
+      timeout_ms: "auto"
     });
     console.log("Result:", JSON.stringify(result, null, 2));
     if (!result.isError) {
@@ -116,12 +115,16 @@ print(f'Working in: {os.getcwd()}')
       console.log("✗ Test 3 failed - File not in custom workspace\n");
       failedTests++;
     }
-
-    // Cleanup
-    await fs.rm(customWorkspace, { recursive: true, force: true });
   } catch (error) {
     console.error("✗ Test 3 failed:", error);
     failedTests++;
+  } finally {
+    // Ensure custom workspace is always cleaned up
+    try {
+      await fs.rm(customWorkspace, { recursive: true, force: true });
+    } catch (cleanupError) {
+      console.warn("Warning: Failed to clean up custom workspace:", cleanupError);
+    }
   }
 
   // Test 4: Detailed return format

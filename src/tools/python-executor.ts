@@ -189,7 +189,11 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     let finalResult: ServerResult;
     if (return_format === "detailed" && !result.isError && result.content && result.content.length > 0) {
       // Add detailed information including workspace path
-      const detailedText = result.content[0].text + 
+      const firstContentItem = result.content[0];
+      const baseText = firstContentItem && typeof firstContentItem.text === 'string'
+        ? firstContentItem.text
+        : '';
+      const detailedText = baseText +
         `\n\n--- Execution Details ---` +
         `\nWorkspace: file://${resolvedTargetDir.replace(/\\/g, '/')}` +
         `\nTimeout: ${timeout_ms}ms` +
