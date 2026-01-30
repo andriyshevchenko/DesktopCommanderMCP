@@ -221,7 +221,10 @@ export const GetRecentToolCallsArgsSchema = z.object({
 export const ExecutePythonCodeArgsSchema = z.object({
   code: z.string().trim().min(1, { message: "code must not be empty" }),
   target_directory: z.string().optional(),
-  timeout_ms: z.number().int().min(1000).max(300000).optional().default(30000),
+  timeout_ms: z.union([
+    z.number().int().min(1000).max(300000),
+    z.literal("auto")
+  ]).optional().default(30000),
   install_packages: z
     .array(
       z
@@ -234,5 +237,14 @@ export const ExecutePythonCodeArgsSchema = z.object({
         }),
     )
     .optional(),
+  workspace: z.union([
+    z.literal("persistent"),
+    z.literal("temp"),
+    z.string() // custom path
+  ]).optional().default("temp"),
+  return_format: z.union([
+    z.literal("simple"),
+    z.literal("detailed")
+  ]).optional().default("simple"),
 });
 

@@ -30,13 +30,59 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     };
   }
 
-  const { code, target_directory, timeout_ms, install_packages } = parsed.data;
+  const { code, target_directory, install_packages, workspace, return_format } = parsed.data;
+  
+  // Auto-detect timeout: 120s if installing packages, 30s otherwise
+  let timeout_ms: number;
+  if (parsed.data.timeout_ms === "auto" || (install_packages && install_packages.length > 0 && parsed.data.timeout_ms === 30000)) {
+    timeout_ms = install_packages && install_packages.length > 0 ? 120000 : 30000;
+  } else if (typeof parsed.data.timeout_ms === "number") {
+    timeout_ms = parsed.data.timeout_ms;
+  } else {
+    timeout_ms = 30000;
+  }
 
   // Create a temporary directory for this execution
   const sessionId = `python-exec-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const tempDir = path.join(os.tmpdir(), sessionId);
   const packagesDir = path.join(tempDir, 'packages');
   const scriptPath = path.join(tempDir, 'script.py');
+
+  // Determine workspace directory
+  let workspaceDir: string;
+  if (workspace === "persistent") {
+    // Use a persistent workspace directory in the user's home directory
+    const homeDir = os.homedir();
+    workspaceDir = path.join(homeDir, '.desktop-commander', 'python-workspace');
+    try {
+      await fs.mkdir(workspaceDir, { recursive: true });
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: Failed to create persistent workspace directory: ${error instanceof Error ? error.message : String(error)}`
+        }],
+        isError: true
+      };
+    }
+  } else if (workspace === "temp") {
+    // Use the temporary directory for this execution (default behavior)
+    workspaceDir = tempDir;
+  } else {
+    // Use custom path if provided
+    workspaceDir = path.isAbsolute(workspace) ? workspace : path.resolve(process.cwd(), workspace);
+    try {
+      await fs.mkdir(workspaceDir, { recursive: true });
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: Failed to create custom workspace directory at ${workspaceDir}: ${error instanceof Error ? error.message : String(error)}`
+        }],
+        isError: true
+      };
+    }
+  }
 
   try {
     // Create directories
@@ -46,8 +92,8 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     // Resolve target directory
     let resolvedTargetDir = target_directory;
     if (!resolvedTargetDir) {
-      // Default to the per-execution temporary directory to maintain sandboxing
-      resolvedTargetDir = tempDir;
+      // Default to the workspace directory (persistent or temp based on workspace parameter)
+      resolvedTargetDir = workspaceDir;
     } else if (!path.isAbsolute(resolvedTargetDir)) {
       resolvedTargetDir = path.resolve(process.cwd(), resolvedTargetDir);
     }
@@ -85,7 +131,26 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     }
 
     // Execute the script
-    const result = await executePythonScript(scriptPath, packagesDir, timeout_ms);
+    const result = await executePythonScript(scriptPath, packagesDir, timeout_ms, resolvedTargetDir);
+
+    // Format result based on return_format
+    let finalResult: ServerResult;
+    if (return_format === "detailed" && !result.isError) {
+      // Add detailed information including workspace path
+      const detailedText = result.content[0].text + 
+        `\n\n--- Execution Details ---` +
+        `\nWorkspace: file://${resolvedTargetDir.replace(/\\/g, '/')}` +
+        `\nTimeout: ${timeout_ms}ms` +
+        (install_packages && install_packages.length > 0 ? 
+          `\nInstalled packages: ${install_packages.join(', ')}` : '');
+      
+      finalResult = {
+        content: [{ type: "text", text: detailedText }],
+        isError: false
+      };
+    } else {
+      finalResult = result;
+    }
 
     // Clean up - don't let cleanup errors prevent returning successful result
     try {
@@ -97,7 +162,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
       });
     }
 
-    return result;
+    return finalResult;
 
   } catch (error) {
     // Ensure cleanup on error
@@ -675,6 +740,13 @@ async function installPythonPackages(
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
     const env = buildMinimalEnvironment();
+    
+    // Force UTF-8 encoding on Windows to prevent charmap codec errors
+    if (process.platform === 'win32') {
+      env.PYTHONIOENCODING = 'utf-8';
+      env.PYTHONUTF8 = '1';
+    }
+    
     const proc = spawn(pythonCmd, args, { env });
 
     let stdout = '';
@@ -730,10 +802,18 @@ async function installPythonPackages(
           isError: true
         });
       } else {
+        // Include progress output if available
+        let installMessage = `Successfully installed packages: ${packages.join(', ')}`;
+        if (stdout && stdout.trim()) {
+          // Extract key information from pip output
+          const lines = stdout.trim().split('\n');
+          const lastFewLines = lines.slice(-5).join('\n'); // Show last 5 lines for context
+          installMessage += `\n\nInstallation summary:\n${lastFewLines}`;
+        }
         resolve({
           content: [{
             type: "text",
-            text: `Successfully installed packages: ${packages.join(', ')}`
+            text: installMessage
           }]
         });
       }
@@ -759,7 +839,8 @@ async function installPythonPackages(
 async function executePythonScript(
   scriptPath: string,
   packagesDir: string,
-  timeout_ms: number
+  timeout_ms: number,
+  workspaceDir: string
 ): Promise<ServerResult> {
   const pythonCmd = await findPythonCommand();
   if (!pythonCmd) {
@@ -777,6 +858,12 @@ async function executePythonScript(
     
     // Add only the managed packages directory to PYTHONPATH to avoid leaking host env
     env.PYTHONPATH = packagesDir;
+    
+    // Force UTF-8 encoding on Windows to prevent charmap codec errors
+    if (process.platform === 'win32') {
+      env.PYTHONIOENCODING = 'utf-8';
+      env.PYTHONUTF8 = '1';
+    }
 
     const proc = spawn(pythonCmd, [scriptPath], {
       env
