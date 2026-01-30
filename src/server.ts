@@ -1010,11 +1010,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         PARAMETERS:
                         - code: Python code to execute (required)
-                        - target_directory: Working directory with read/write access (optional; if omitted, uses workspace directory)
-                        - timeout_ms: Execution timeout in milliseconds (optional, default: 30000, or "auto" for smart detection)
+                        - target_directory: Working directory with read/write access (optional; if omitted, uses workspace directory; if provided, overrides workspace parameter)
+                        - timeout_ms: Execution timeout in milliseconds (optional, default: "auto" for smart detection - 120s with packages, 30s without)
                         - install_packages: Array of pip package names to install before execution (optional, auto-extends timeout to 120s)
-                        - workspace: "persistent" (~/.desktop-commander/python-workspace), "temp" (default, cleaned after), or custom path (optional)
+                        - workspace: "persistent" (~/.desktop-commander/python-workspace), "temp" (default, cleaned after), or custom path (optional; ignored if target_directory is set)
                         - return_format: "simple" (default, just output) or "detailed" (includes workspace path, timeout, packages) (optional)
+                        
+                        NOTE ON CONCURRENT EXECUTION: Multiple executions with workspace="persistent" share the same directory 
+                        without coordination. Use unique file names or subdirectories to avoid conflicts between concurrent executions.
                         
                         EXAMPLES:
                         1. Simple calculation:

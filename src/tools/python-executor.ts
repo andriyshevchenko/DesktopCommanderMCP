@@ -51,15 +51,29 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
   let workspaceDir: string;
   if (workspace === "persistent") {
     // Use a persistent workspace directory in the user's home directory
+    // NOTE: Concurrent executions with workspace="persistent" will share the same directory
+    // without coordination. Use unique file names or subdirectories to avoid conflicts.
     const homeDir = os.homedir();
     workspaceDir = path.join(homeDir, '.desktop-commander', 'python-workspace');
     try {
       await fs.mkdir(workspaceDir, { recursive: true });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let helpText = `Error: Failed to create persistent workspace directory at ${workspaceDir}: ${errorMessage}`;
+      
+      // Add helpful suggestions based on common error types
+      if (errorMessage.includes('EACCES') || errorMessage.includes('permission denied')) {
+        helpText += '\n\nSuggestion: Check that you have write permissions to your home directory.';
+      } else if (errorMessage.includes('ENOSPC') || errorMessage.includes('no space')) {
+        helpText += '\n\nSuggestion: Free up disk space and try again.';
+      } else if (errorMessage.includes('ENOTDIR')) {
+        helpText += '\n\nSuggestion: A file exists at this path. Remove it or use a different workspace.';
+      }
+      
       return {
         content: [{
           type: "text",
-          text: `Error: Failed to create persistent workspace directory: ${error instanceof Error ? error.message : String(error)}`
+          text: helpText
         }],
         isError: true
       };
@@ -69,14 +83,44 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     workspaceDir = tempDir;
   } else {
     // Use custom path if provided
-    workspaceDir = path.isAbsolute(workspace) ? workspace : path.resolve(process.cwd(), workspace);
+    // Resolve relative paths against current working directory
+    // For absolute paths, validate they don't escape via path traversal
+    if (path.isAbsolute(workspace)) {
+      workspaceDir = path.normalize(workspace);
+    } else {
+      const customWorkspaceBaseDir = path.resolve(process.cwd());
+      workspaceDir = path.resolve(customWorkspaceBaseDir, workspace);
+      
+      // Validate that relative paths don't escape the base directory via ".." traversal
+      const relativeToBase = path.relative(customWorkspaceBaseDir, workspaceDir);
+      if (relativeToBase.startsWith('..') || path.isAbsolute(relativeToBase)) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error: Invalid custom workspace directory "${workspace}". Relative paths must stay within the base directory ${customWorkspaceBaseDir}.`
+          }],
+          isError: true
+        };
+      }
+    }
+    
     try {
       await fs.mkdir(workspaceDir, { recursive: true });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let helpText = `Error: Failed to create custom workspace directory at ${workspaceDir}: ${errorMessage}`;
+      
+      // Add helpful suggestions based on common error types
+      if (errorMessage.includes('EACCES') || errorMessage.includes('permission denied')) {
+        helpText += '\n\nSuggestion: Check that you have write permissions to this directory.';
+      } else if (errorMessage.includes('ENOSPC') || errorMessage.includes('no space')) {
+        helpText += '\n\nSuggestion: Free up disk space and try again.';
+      }
+      
       return {
         content: [{
           type: "text",
-          text: `Error: Failed to create custom workspace directory at ${workspaceDir}: ${error instanceof Error ? error.message : String(error)}`
+          text: helpText
         }],
         isError: true
       };
@@ -89,6 +133,10 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     await fs.mkdir(packagesDir, { recursive: true });
 
     // Resolve target directory
+    // NOTE: If target_directory is specified, it takes precedence over workspace parameter.
+    // This means workspace="persistent" is ignored when target_directory is provided.
+    // Use workspace without target_directory to work in the persistent workspace,
+    // or set target_directory explicitly to override workspace behavior.
     let resolvedTargetDir = target_directory;
     if (!resolvedTargetDir) {
       // Default to the workspace directory (persistent or temp based on workspace parameter)
@@ -804,10 +852,32 @@ async function installPythonPackages(
         // Include progress output if available
         let installMessage = `Successfully installed packages: ${packages.join(', ')}`;
         if (stdout && stdout.trim()) {
-          // Extract key information from pip output
+          // Extract key information from pip output, filtering out noisy progress lines
           const lines = stdout.trim().split('\n');
-          const lastFewLines = lines.slice(-5).join('\n'); // Show last 5 lines for context
-          installMessage += `\n\nInstallation summary:\n${lastFewLines}`;
+          const meaningfulLines = lines.filter((line) => {
+            const trimmed = line.trim();
+            return (
+              trimmed.startsWith('Successfully installed') ||
+              trimmed.startsWith('Requirement already satisfied') ||
+              trimmed.startsWith('ERROR:') ||
+              trimmed.startsWith('WARNING:') ||
+              trimmed.startsWith('Failed') ||
+              trimmed.startsWith('Collecting ')
+            );
+          });
+
+          let summary: string;
+          if (meaningfulLines.length > 0) {
+            summary = meaningfulLines.join('\n');
+          } else {
+            // Fallback: show the last few non-empty lines for context
+            const nonEmptyLines = lines.map(l => l.trim()).filter(l => l.length > 0);
+            summary = nonEmptyLines.slice(-5).join('\n');
+          }
+
+          if (summary && summary.trim()) {
+            installMessage += `\n\nInstallation summary:\n${summary}`;
+          }
         }
         resolve({
           content: [{

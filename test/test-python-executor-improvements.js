@@ -61,7 +61,15 @@ except FileNotFoundError:
     });
     console.log("Second execution result:", JSON.stringify(result2, null, 2));
 
-    if (result2.content && result2.content[0] && result2.content[0].text.includes('Test from first execution')) {
+    const hasExpectedContent =
+      result2 &&
+      Array.isArray(result2.content) &&
+      result2.content.length > 0 &&
+      result2.content[0] &&
+      typeof result2.content[0].text === 'string' &&
+      result2.content[0].text.includes('Test from first execution');
+
+    if (hasExpectedContent) {
       console.log("✓ Test 2 passed - Persistent workspace works\n");
     } else {
       console.log("✗ Test 2 failed - Workspace persistence not working\n");
@@ -126,7 +134,15 @@ print(f'Working in: {os.getcwd()}')
     });
     console.log("Result:", JSON.stringify(result, null, 2));
 
-    if (result.content && result.content[0] && result.content[0].text.includes('Execution Details')) {
+    const hasExpectedContent =
+      result &&
+      Array.isArray(result.content) &&
+      result.content.length > 0 &&
+      result.content[0] &&
+      typeof result.content[0].text === 'string' &&
+      result.content[0].text.includes('Execution Details');
+
+    if (hasExpectedContent) {
       console.log("✓ Test 4 passed - Detailed format includes execution info\n");
     } else {
       console.log("✗ Test 4 failed - Missing detailed information\n");
