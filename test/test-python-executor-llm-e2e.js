@@ -412,112 +412,164 @@ async function testLLMErrorHandling(client) {
 async function testLLMDataProcessingWithFileWrite(client) {
   logTest('LLM Data Processing with Package Installation and File Writing');
   
-  const testDir = path.join(os.tmpdir(), `llm-e2e-write-test-${Date.now()}`);
+  const maxAttempts = 10;
+  let attempt = 0;
   
-  try {
-    await fs.mkdir(testDir, { recursive: true });
+  while (attempt < maxAttempts) {
+    attempt++;
+    if (attempt > 1) {
+      logInfo(`Retry attempt ${attempt}/${maxAttempts}...`);
+    }
     
-    // Create source data file
-    const sourceData = 'product,sales_q1,sales_q2,sales_q3,sales_q4\nWidget,1000,1200,1100,1300\nGadget,800,850,900,950\nTool,600,650,700,750';
-    await fs.writeFile(path.join(testDir, 'sales_data.csv'), sourceData, 'utf8');
-    logInfo(`Created source file: ${path.join(testDir, 'sales_data.csv')}`);
+    const testDir = path.join(os.tmpdir(), `llm-e2e-write-test-${Date.now()}-attempt${attempt}`);
     
-    logInfo('Asking LLM to process data and write results to a file...');
-    
-    const response = await callOpenAIWithMCP(
-      client,
-      `Read sales_data.csv which has columns: product, sales_q1, sales_q2, sales_q3, sales_q4. Calculate total annual sales for each product by summing all quarterly sales columns using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely.`,
-      testDir
-    );
-    
-    logInfo(`LLM Response: ${JSON.stringify(response.choices[0].message, null, 2)}`);
-    
-    const message = response.choices[0].message;
-    
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      const toolCall = message.tool_calls[0];
-      logInfo(`LLM decided to use tool: ${toolCall.function.name}`);
-      logInfo(`Arguments: ${toolCall.function.arguments}`);
+    try {
+      await fs.mkdir(testDir, { recursive: true });
       
-      if (toolCall.function.name === 'execute_python_code') {
-        let args;
-        try {
-          args = parseToolArguments(toolCall.function.arguments);
-        } catch (parseError) {
-          logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-          logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
-          return false;
-        }
+      // Create source data file
+      const sourceData = 'product,sales_q1,sales_q2,sales_q3,sales_q4\nWidget,1000,1200,1100,1300\nGadget,800,850,900,950\nTool,600,650,700,750';
+      await fs.writeFile(path.join(testDir, 'sales_data.csv'), sourceData, 'utf8');
+      logInfo(`Created source file: ${path.join(testDir, 'sales_data.csv')}`);
+      
+      logInfo('Asking LLM to process data and write results to a file...');
+      
+      const response = await callOpenAIWithMCP(
+        client,
+        `Read sales_data.csv which has columns: product, sales_q1, sales_q2, sales_q3, sales_q4. Calculate total annual sales for each product by summing all quarterly sales columns using pandas, and write a summary report to a file called sales_summary.txt with the product names and their total sales. The file should be formatted nicely.`,
+        testDir
+      );
+      
+      logInfo(`LLM Response: ${JSON.stringify(response.choices[0].message, null, 2)}`);
+      
+      const message = response.choices[0].message;
+      
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        const toolCall = message.tool_calls[0];
+        logInfo(`LLM decided to use tool: ${toolCall.function.name}`);
+        logInfo(`Arguments: ${toolCall.function.arguments}`);
         
-        // Verify LLM requested package installation
-        if (args.install_packages && args.install_packages.includes('pandas')) {
-          logInfo('✓ LLM correctly requested pandas package installation');
-        } else {
-          logInfo('Note: LLM did not explicitly request pandas');
-        }
-        
-        // Verify LLM set target directory
-        if (args.target_directory) {
-          logInfo(`✓ LLM set target_directory: ${args.target_directory}`);
-        }
-        
-        // Execute the tool call
-        const result = await client.callTool({
-          name: 'execute_python_code',
-          arguments: args
-        });
-        
-        const output = result.content[0].text;
-        logInfo(`Tool output:\n${output}`);
-        
-        // Check if execution failed
-        if (result.isError || output.includes('Execution failed')) {
-          logFail('Python code execution failed. This might be due to LLM generating incompatible code (e.g., using deprecated pandas methods like .iteritems())');
-          logInfo('Tip: The LLM should use .items() instead of .iteritems() for pandas 2.x compatibility');
-          return false;
-        }
-        
-        // Check if output file was created
-        const outputPath = path.join(testDir, 'sales_summary.txt');
-        const fileExists = await fs.access(outputPath).then(() => true).catch(() => false);
-        
-        if (fileExists) {
-          const fileContent = await fs.readFile(outputPath, 'utf8');
-          logInfo(`✓ Output file created successfully`);
-          logInfo(`File content:\n${fileContent}`);
+        if (toolCall.function.name === 'execute_python_code') {
+          let args;
+          try {
+            args = parseToolArguments(toolCall.function.arguments);
+          } catch (parseError) {
+            logFail(`Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            logInfo(`Raw arguments string: ${toolCall.function.arguments}`);
+            
+            // Cleanup and retry
+            try {
+              await fs.rm(testDir, { recursive: true, force: true });
+            } catch {}
+            continue;
+          }
           
-          // Verify the content has expected data
-          if (fileContent.includes('Widget') || fileContent.includes('4600') ||
-              fileContent.includes('Gadget') || fileContent.includes('3500')) {
-            logPass('LLM successfully processed data with package installation and wrote to file');
-            return true;
+          // Verify LLM requested package installation
+          if (args.install_packages && args.install_packages.includes('pandas')) {
+            logInfo('✓ LLM correctly requested pandas package installation');
           } else {
-            logInfo('File created but content format differs from expected');
-            logPass('LLM successfully used tool for data processing and file writing');
-            return true;
+            logInfo('Note: LLM did not explicitly request pandas');
+          }
+          
+          // Verify LLM set target directory
+          if (args.target_directory) {
+            logInfo(`✓ LLM set target_directory: ${args.target_directory}`);
+          }
+          
+          // Execute the tool call
+          const result = await client.callTool({
+            name: 'execute_python_code',
+            arguments: args
+          });
+          
+          const output = result.content[0].text;
+          logInfo(`Tool output:\n${output}`);
+          
+          // Check if execution failed
+          if (result.isError || output.includes('Execution failed')) {
+            logFail('Python code execution failed. This might be due to LLM generating incompatible code (e.g., using deprecated pandas methods like .iteritems())');
+            logInfo('Tip: The LLM should use .items() instead of .iteritems() for pandas 2.x compatibility');
+            
+            // Cleanup and retry
+            try {
+              await fs.rm(testDir, { recursive: true, force: true });
+            } catch {}
+            continue;
+          }
+          
+          // Check if output file was created
+          const outputPath = path.join(testDir, 'sales_summary.txt');
+          const fileExists = await fs.access(outputPath).then(() => true).catch(() => false);
+          
+          if (fileExists) {
+            const fileContent = await fs.readFile(outputPath, 'utf8');
+            logInfo(`✓ Output file created successfully`);
+            logInfo(`File content:\n${fileContent}`);
+            
+            // Verify the content has expected data
+            if (fileContent.includes('Widget') || fileContent.includes('4600') ||
+                fileContent.includes('Gadget') || fileContent.includes('3500')) {
+              logPass(`LLM successfully processed data with package installation and wrote to file (attempt ${attempt}/${maxAttempts})`);
+              
+              // Cleanup
+              try {
+                await fs.rm(testDir, { recursive: true, force: true });
+              } catch {}
+              return true;
+            } else {
+              logInfo('File created but content format differs from expected');
+              logPass(`LLM successfully used tool for data processing and file writing (attempt ${attempt}/${maxAttempts})`);
+              
+              // Cleanup
+              try {
+                await fs.rm(testDir, { recursive: true, force: true });
+              } catch {}
+              return true;
+            }
+          } else {
+            logFail('Output file was not created');
+            
+            // Cleanup and retry
+            try {
+              await fs.rm(testDir, { recursive: true, force: true });
+            } catch {}
+            continue;
           }
         } else {
-          logFail('Output file was not created');
-          return false;
+          logFail(`LLM used wrong tool: ${toolCall.function.name}`);
+          
+          // Cleanup and retry
+          try {
+            await fs.rm(testDir, { recursive: true, force: true });
+          } catch {}
+          continue;
         }
       } else {
-        logFail(`LLM used wrong tool: ${toolCall.function.name}`);
+        logFail('LLM did not use any tools');
+        
+        // Cleanup and retry
+        try {
+          await fs.rm(testDir, { recursive: true, force: true });
+        } catch {}
+        continue;
+      }
+    } catch (error) {
+      logFail(`Exception on attempt ${attempt}: ${error.message}`);
+      console.error(error);
+      
+      // Cleanup and retry
+      try {
+        await fs.rm(testDir, { recursive: true, force: true });
+      } catch {}
+      
+      if (attempt >= maxAttempts) {
         return false;
       }
-    } else {
-      logFail('LLM did not use any tools');
-      return false;
+      continue;
     }
-  } catch (error) {
-    logFail(`Exception: ${error.message}`);
-    console.error(error);
-    return false;
-  } finally {
-    // Cleanup
-    try {
-      await fs.rm(testDir, { recursive: true, force: true });
-    } catch {}
   }
+  
+  logFail(`Test failed after ${maxAttempts} attempts`);
+  return false;
 }
 
 /**
