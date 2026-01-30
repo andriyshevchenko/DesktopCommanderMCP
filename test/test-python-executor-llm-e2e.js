@@ -86,16 +86,18 @@ async function createMcpClient() {
 }
 
 /**
- * Parse JSON with fallback for OpenAI's invalid escape sequences
- * OpenAI sometimes returns Python code with \' which is invalid in JSON.
+ * Parse JSON with fallback for OpenAI's invalid escape sequences and control characters
+ * OpenAI sometimes returns Python code with \' which is invalid in JSON, or with
+ * unescaped control characters like newlines, tabs, etc.
  * 
  * Note: This replacement is done at the JSON level (before parsing) and should
  * not affect legitimate escaped quotes within Python string literals that are
  * properly JSON-encoded. The replacement only occurs if standard JSON parsing fails,
  * indicating a malformed JSON response from OpenAI.
  * 
- * Currently handles only \' sequences. If other escape issues arise,
- * this function can be extended to handle additional patterns.
+ * Currently handles:
+ * - \' sequences (invalid in JSON)
+ * - Unescaped newlines, tabs, and other control characters in strings
  */
 function parseToolArguments(jsonString) {
   try {
@@ -103,12 +105,28 @@ function parseToolArguments(jsonString) {
     return JSON.parse(jsonString);
   } catch (firstError) {
     try {
-      // If that fails, try to fix common OpenAI escape issues
+      // If that fails, try to fix common OpenAI issues
+      let fixed = jsonString;
+      
       // Replace \' with ' (since \' is not a valid JSON escape sequence)
-      const fixed = jsonString.replace(/\\'/g, "'");
+      fixed = fixed.replace(/\\'/g, "'");
+      
+      // Fix unescaped control characters within string values
+      // This regex finds string values and escapes control characters within them
+      fixed = fixed.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match) => {
+        // Don't modify keys that look like property names (followed by :)
+        return match
+          .replace(/\n/g, '\\n')   // Escape newlines
+          .replace(/\r/g, '\\r')   // Escape carriage returns
+          .replace(/\t/g, '\\t')   // Escape tabs
+          .replace(/\f/g, '\\f')   // Escape form feeds
+          .replace(/\b/g, '\\b');  // Escape backspaces
+      });
+      
       return JSON.parse(fixed);
     } catch (secondError) {
       // If both fail, throw the original error with more context
+      logInfo(`Raw arguments string: ${jsonString.substring(0, 200)}...`);
       throw new Error(`${firstError.message} (also tried fixing escape sequences)`);
     }
   }
