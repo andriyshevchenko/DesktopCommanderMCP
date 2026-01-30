@@ -30,7 +30,16 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     };
   }
 
-  const { code, target_directory, timeout_ms, install_packages } = parsed.data;
+  const { code, target_directory, install_packages, workspace, return_format } = parsed.data;
+  
+  // Auto-detect timeout: 120s if installing packages, 30s otherwise
+  // If user explicitly sets a numeric timeout, always respect it
+  let timeout_ms: number;
+  if (parsed.data.timeout_ms === "auto") {
+    timeout_ms = install_packages && install_packages.length > 0 ? 120000 : 30000;
+  } else {
+    timeout_ms = parsed.data.timeout_ms;
+  }
 
   // Create a temporary directory for this execution
   const sessionId = `python-exec-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -38,16 +47,105 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
   const packagesDir = path.join(tempDir, 'packages');
   const scriptPath = path.join(tempDir, 'script.py');
 
+  // Determine workspace directory
+  let workspaceDir: string;
+  if (workspace === "persistent") {
+    // Use a persistent workspace directory in the user's home directory
+    // NOTE: Concurrent executions with workspace="persistent" will share the same directory
+    // without coordination. Use unique file names or subdirectories to avoid conflicts.
+    const homeDir = os.homedir();
+    workspaceDir = path.join(homeDir, '.desktop-commander', 'python-workspace');
+    try {
+      await fs.mkdir(workspaceDir, { recursive: true });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let helpText = `Error: Failed to create persistent workspace directory at ${workspaceDir}: ${errorMessage}`;
+      
+      // Add helpful suggestions based on common error types
+      if (errorMessage.includes('EACCES') || errorMessage.includes('permission denied')) {
+        helpText += '\n\nSuggestion: Check that you have write permissions to your home directory.';
+      } else if (errorMessage.includes('ENOSPC') || errorMessage.includes('no space')) {
+        helpText += '\n\nSuggestion: Free up disk space and try again.';
+      } else if (errorMessage.includes('ENOTDIR')) {
+        helpText += '\n\nSuggestion: A file exists at this path. Remove it or use a different workspace.';
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: helpText
+        }],
+        isError: true
+      };
+    }
+  } else if (workspace === "temp") {
+    // Use the temporary directory for this execution (default behavior)
+    workspaceDir = tempDir;
+  } else {
+    // Use custom path if provided
+    // Resolve relative paths against current working directory
+    // Absolute paths are normalized and trusted by design - callers providing absolute
+    // paths are responsible for ensuring they're safe and don't access sensitive areas.
+    if (path.isAbsolute(workspace)) {
+      // Normalize to resolve any ".." sequences in absolute paths
+      // Note: We normalize but don't restrict absolute paths as they're explicitly provided
+      // by the caller who presumably knows what they're doing. For untrusted input,
+      // use relative paths which are validated below.
+      workspaceDir = path.normalize(workspace);
+    } else {
+      const customWorkspaceBaseDir = path.resolve(process.cwd());
+      workspaceDir = path.resolve(customWorkspaceBaseDir, workspace);
+      
+      // Validate that relative paths don't escape the base directory via ".." traversal
+      const relativeToBase = path.relative(customWorkspaceBaseDir, workspaceDir);
+      if (relativeToBase.startsWith('..') || path.isAbsolute(relativeToBase)) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error: Invalid custom workspace directory "${workspace}". Relative paths must stay within the base directory ${customWorkspaceBaseDir}.`
+          }],
+          isError: true
+        };
+      }
+    }
+    
+    try {
+      await fs.mkdir(workspaceDir, { recursive: true });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let helpText = `Error: Failed to create custom workspace directory at ${workspaceDir}: ${errorMessage}`;
+      
+      // Add helpful suggestions based on common error types
+      if (errorMessage.includes('EACCES') || errorMessage.includes('permission denied')) {
+        helpText += '\n\nSuggestion: Check that you have write permissions to this directory.';
+      } else if (errorMessage.includes('ENOSPC') || errorMessage.includes('no space')) {
+        helpText += '\n\nSuggestion: Free up disk space and try again.';
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: helpText
+        }],
+        isError: true
+      };
+    }
+  }
+
   try {
     // Create directories
     await fs.mkdir(tempDir, { recursive: true });
     await fs.mkdir(packagesDir, { recursive: true });
 
     // Resolve target directory
+    // NOTE: If target_directory is specified, it takes precedence over workspace parameter.
+    // This means workspace="persistent" is ignored when target_directory is provided.
+    // Use workspace without target_directory to work in the persistent workspace,
+    // or set target_directory explicitly to override workspace behavior.
     let resolvedTargetDir = target_directory;
     if (!resolvedTargetDir) {
-      // Default to the per-execution temporary directory to maintain sandboxing
-      resolvedTargetDir = tempDir;
+      // Default to the workspace directory (persistent or temp based on workspace parameter)
+      resolvedTargetDir = workspaceDir;
     } else if (!path.isAbsolute(resolvedTargetDir)) {
       resolvedTargetDir = path.resolve(process.cwd(), resolvedTargetDir);
     }
@@ -87,6 +185,29 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     // Execute the script
     const result = await executePythonScript(scriptPath, packagesDir, timeout_ms);
 
+    // Format result based on return_format
+    let finalResult: ServerResult;
+    if (return_format === "detailed" && !result.isError && result.content && result.content.length > 0) {
+      // Add detailed information including workspace path
+      const firstContentItem = result.content[0];
+      const baseText = firstContentItem && typeof firstContentItem.text === 'string'
+        ? firstContentItem.text
+        : '';
+      const detailedText = baseText +
+        `\n\n--- Execution Details ---` +
+        `\nWorkspace: file://${resolvedTargetDir.replace(/\\/g, '/')}` +
+        `\nTimeout: ${timeout_ms}ms` +
+        (install_packages && install_packages.length > 0 ? 
+          `\nInstalled packages: ${install_packages.join(', ')}` : '');
+      
+      finalResult = {
+        content: [{ type: "text", text: detailedText }],
+        isError: false
+      };
+    } else {
+      finalResult = result;
+    }
+
     // Clean up - don't let cleanup errors prevent returning successful result
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -97,7 +218,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
       });
     }
 
-    return result;
+    return finalResult;
 
   } catch (error) {
     // Ensure cleanup on error
@@ -675,6 +796,13 @@ async function installPythonPackages(
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
     const env = buildMinimalEnvironment();
+    
+    // Force UTF-8 encoding on Windows to prevent charmap codec errors
+    if (process.platform === 'win32') {
+      env.PYTHONIOENCODING = 'utf-8';
+      env.PYTHONUTF8 = '1';
+    }
+    
     const proc = spawn(pythonCmd, args, { env });
 
     let stdout = '';
@@ -730,10 +858,40 @@ async function installPythonPackages(
           isError: true
         });
       } else {
+        // Include progress output if available
+        let installMessage = `Successfully installed packages: ${packages.join(', ')}`;
+        if (stdout && stdout.trim()) {
+          // Extract key information from pip output, filtering out noisy progress lines
+          const lines = stdout.trim().split('\n');
+          const meaningfulLines = lines.filter((line) => {
+            const trimmed = line.trim();
+            return (
+              trimmed.startsWith('Successfully installed') ||
+              trimmed.startsWith('Requirement already satisfied') ||
+              trimmed.startsWith('ERROR:') ||
+              trimmed.startsWith('WARNING:') ||
+              trimmed.startsWith('Failed') ||
+              trimmed.startsWith('Collecting ')
+            );
+          });
+
+          let summary: string;
+          if (meaningfulLines.length > 0) {
+            summary = meaningfulLines.join('\n');
+          } else {
+            // Fallback: show the last few non-empty lines for context
+            const nonEmptyLines = lines.map(l => l.trim()).filter(l => l.length > 0);
+            summary = nonEmptyLines.slice(-5).join('\n');
+          }
+
+          if (summary && summary.trim()) {
+            installMessage += `\n\nInstallation summary:\n${summary}`;
+          }
+        }
         resolve({
           content: [{
             type: "text",
-            text: `Successfully installed packages: ${packages.join(', ')}`
+            text: installMessage
           }]
         });
       }
@@ -777,6 +935,12 @@ async function executePythonScript(
     
     // Add only the managed packages directory to PYTHONPATH to avoid leaking host env
     env.PYTHONPATH = packagesDir;
+    
+    // Force UTF-8 encoding on Windows to prevent charmap codec errors
+    if (process.platform === 'win32') {
+      env.PYTHONIOENCODING = 'utf-8';
+      env.PYTHONUTF8 = '1';
+    }
 
     const proc = spawn(pythonCmd, [scriptPath], {
       env
