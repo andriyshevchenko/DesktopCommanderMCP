@@ -993,9 +993,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         FEATURES:
                         - Automatic package installation with pip (internet access required)
-                        - Filesystem access restrictions (best-effort) to target directory and temp directory
+                        - Auto-timeout: 120s when installing packages, 30s otherwise (or use timeout_ms="auto")
+                        - Persistent workspace: Files persist across executions (set workspace="persistent")
+                        - UTF-8 encoding: Enforced on Windows to prevent charmap codec errors
+                        - Filesystem access restrictions (best-effort) to target directory and workspace
                         - Packages installed to separate session-specific directory
-                        - Timeout protection for long-running scripts
+                        - Detailed output format: Include workspace path and execution stats (set return_format="detailed")
                         
                         SECURITY:
                         The code runs with best-effort filesystem access restrictions:
@@ -1007,22 +1010,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         PARAMETERS:
                         - code: Python code to execute (required)
-                        - target_directory: Working directory with read/write access (optional; if omitted, a new isolated temporary directory is used—pass this explicitly to work with existing files)
-                        - timeout_ms: Execution timeout in milliseconds (optional, default: 30000)
-                        - install_packages: Array of pip package names to install before execution (optional)
+                        - target_directory: Working directory with read/write access (optional; if omitted, uses workspace directory)
+                        - timeout_ms: Execution timeout in milliseconds (optional, default: 30000, or "auto" for smart detection)
+                        - install_packages: Array of pip package names to install before execution (optional, auto-extends timeout to 120s)
+                        - workspace: "persistent" (~/.desktop-commander/python-workspace), "temp" (default, cleaned after), or custom path (optional)
+                        - return_format: "simple" (default, just output) or "detailed" (includes workspace path, timeout, packages) (optional)
                         
                         EXAMPLES:
                         1. Simple calculation:
                            code: "print(2 + 2)"
                         
-                        2. File analysis with pandas:
+                        2. File analysis with pandas (auto-timeout):
                            code: "import pandas as pd\\ndf = pd.read_csv('data.csv')\\nprint(df.head())"
                            target_directory: "/path/to/data"
                            install_packages: ["pandas"]
+                           // Timeout automatically extended to 120s due to package installation
                         
-                        3. Data processing with multiple packages:
-                           code: "import numpy as np\\nimport matplotlib.pyplot as plt\\nx = np.linspace(0, 10, 100)\\nprint(f'Generated {len(x)} points')"
-                           install_packages: ["numpy", "matplotlib"]
+                        3. Persistent workspace for multi-step analysis:
+                           code: "import pandas as pd\\ndf = pd.DataFrame({'x': [1,2,3]})\\ndf.to_csv('analysis.csv')"
+                           workspace: "persistent"
+                           install_packages: ["pandas"]
+                           // Files persist in ~/.desktop-commander/python-workspace for next execution
+                        
+                        4. Detailed execution info:
+                           code: "print('Processing complete')"
+                           return_format: "detailed"
+                           // Returns output plus workspace path, timeout, and package info
                         
                         COMPARISON WITH start_process:
                         - Use execute_python_code for: Quick scripts, data analysis, automatic package management, sandboxed execution
@@ -1030,7 +1043,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         LIMITATIONS:
                         - Requires Python 3 to be installed on the system
-                        - Code execution is stateless (each call is independent)
+                        - Code execution is stateless unless using persistent workspace
                         - Network operations are allowed but filesystem is restricted
                         - No interactive input during execution
                         

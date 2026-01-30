@@ -218,12 +218,18 @@ export const GetRecentToolCallsArgsSchema = z.object({
 });
 
 // Python code execution schema
+// Improvements:
+// - Auto timeout: Set timeout_ms to "auto" to automatically use 120s when installing packages, 30s otherwise
+// - Persistent workspace: Use workspace="persistent" to maintain files across executions in ~/.desktop-commander/python-workspace
+// - Custom workspace: Provide a custom path to workspace parameter for a specific directory
+// - Detailed format: Set return_format="detailed" to include workspace path and execution stats
+// - UTF-8 encoding: Automatically enforced on Windows to prevent charmap codec errors
 export const ExecutePythonCodeArgsSchema = z.object({
   code: z.string().trim().min(1, { message: "code must not be empty" }),
   target_directory: z.string().optional(),
   timeout_ms: z.union([
     z.number().int().min(1000).max(300000),
-    z.literal("auto")
+    z.literal("auto")  // Auto-detect: 120s with packages, 30s without
   ]).optional().default(30000),
   install_packages: z
     .array(
@@ -238,13 +244,13 @@ export const ExecutePythonCodeArgsSchema = z.object({
     )
     .optional(),
   workspace: z.union([
-    z.literal("persistent"),
-    z.literal("temp"),
-    z.string() // custom path
+    z.literal("persistent"),  // Use ~/.desktop-commander/python-workspace (persists across executions)
+    z.literal("temp"),        // Use temporary directory (default, cleaned up after execution)
+    z.string()                // Custom absolute or relative path
   ]).optional().default("temp"),
   return_format: z.union([
-    z.literal("simple"),
-    z.literal("detailed")
+    z.literal("simple"),      // Just stdout/stderr (default)
+    z.literal("detailed")     // Includes workspace path, timeout, installed packages
   ]).optional().default("simple"),
 });
 
