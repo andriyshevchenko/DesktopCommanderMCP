@@ -84,8 +84,13 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
   } else {
     // Use custom path if provided
     // Resolve relative paths against current working directory
-    // For absolute paths, validate they don't escape via path traversal
+    // Absolute paths are normalized and trusted by design - callers providing absolute
+    // paths are responsible for ensuring they're safe and don't access sensitive areas.
     if (path.isAbsolute(workspace)) {
+      // Normalize to resolve any ".." sequences in absolute paths
+      // Note: We normalize but don't restrict absolute paths as they're explicitly provided
+      // by the caller who presumably knows what they're doing. For untrusted input,
+      // use relative paths which are validated below.
       workspaceDir = path.normalize(workspace);
     } else {
       const customWorkspaceBaseDir = path.resolve(process.cwd());
