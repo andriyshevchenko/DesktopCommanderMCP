@@ -14,7 +14,7 @@ async function testPackageCaching() {
   console.log("=== Testing Python Package Caching ===\n");
 
   let failedTests = 0;
-  const totalTests = 3;
+  const totalTests = 4; // Updated to reflect actual number of tests
 
   // Use a small, fast-to-install package for testing
   // Using a package that's unlikely to be in the system Python

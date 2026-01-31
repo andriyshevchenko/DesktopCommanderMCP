@@ -786,7 +786,7 @@ async function checkPackagesInstalled(packagesDir: string, packages: string[]): 
     for (const pkg of packages) {
       // Extract package name without version specifiers
       // Examples: "pandas==2.0.0" -> "pandas", "numpy>=1.20" -> "numpy", "openpyxl" -> "openpyxl"
-      const basePackageName = pkg.split(/[<>=![\]]/)[0].trim().toLowerCase();
+      const basePackageName = pkg.split(/[<>=!\[\]]/)[0].trim().toLowerCase();
       
       // Check if any directory matches this package name
       // Python packages can be installed as either:

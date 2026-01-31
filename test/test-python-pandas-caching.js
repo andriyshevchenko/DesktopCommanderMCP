@@ -2,6 +2,7 @@ import { executePythonCode } from '../dist/tools/python-executor.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
 
 /**
  * Manual test to demonstrate package caching with pandas
@@ -143,7 +144,7 @@ print("\\nDataFrame shape:", df.shape)
 }
 
 // Only run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
   console.log("NOTE: This test requires internet access to install pandas on first run.");
   console.log("Set RUN_NETWORK_TESTS=1 environment variable if you want to run this test.\n");
   
