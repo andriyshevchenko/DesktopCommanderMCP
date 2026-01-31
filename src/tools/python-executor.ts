@@ -176,12 +176,17 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     await fs.writeFile(scriptPath, wrapperCode, 'utf8');
 
     // Install packages if requested
+    let installStatusMessage = '';
     if (install_packages && install_packages.length > 0) {
       const installResult = await installPythonPackages(packagesDir, install_packages, timeout_ms, force_reinstall);
       if (installResult.isError) {
         // Clean up
         await fs.rm(tempDir, { recursive: true, force: true });
         return installResult;
+      }
+      // Store installation status message to include in output
+      if (installResult.content && installResult.content[0]) {
+        installStatusMessage = installResult.content[0].text || '';
       }
     }
 
@@ -201,10 +206,21 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
         `\nWorkspace: file://${resolvedTargetDir.replace(/\\/g, '/')}` +
         `\nTimeout: ${timeout_ms}ms` +
         (install_packages && install_packages.length > 0 ? 
-          `\nInstalled packages: ${install_packages.join(', ')}` : '');
+          `\nInstalled packages: ${install_packages.join(', ')}` : '') +
+        (installStatusMessage ? `\n\n${installStatusMessage}` : '');
       
       finalResult = {
         content: [{ type: "text", text: detailedText }],
+        isError: false
+      };
+    } else if (installStatusMessage && !result.isError && result.content && result.content.length > 0) {
+      // For simple mode, prepend installation status to the output
+      const firstContentItem = result.content[0];
+      const baseText = firstContentItem && typeof firstContentItem.text === 'string'
+        ? firstContentItem.text
+        : '';
+      finalResult = {
+        content: [{ type: "text", text: `${installStatusMessage}\n\n--- Script Output ---\n${baseText}` }],
         isError: false
       };
     } else {
