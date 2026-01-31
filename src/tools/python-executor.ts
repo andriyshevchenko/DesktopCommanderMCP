@@ -30,7 +30,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     };
   }
 
-  const { code, target_directory, install_packages, workspace, return_format } = parsed.data;
+  const { code, target_directory, install_packages, workspace, return_format, force_reinstall } = parsed.data;
   
   // Auto-detect timeout: 120s if installing packages, 30s otherwise
   // If user explicitly sets a numeric timeout, always respect it
@@ -41,11 +41,14 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     timeout_ms = parsed.data.timeout_ms;
   }
 
-  // Create a temporary directory for this execution
+  // Create a temporary directory for this execution (for script file only)
   const sessionId = `python-exec-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const tempDir = path.join(os.tmpdir(), sessionId);
-  const packagesDir = path.join(tempDir, 'packages');
   const scriptPath = path.join(tempDir, 'script.py');
+  
+  // Use persistent package cache directory for all package installations
+  const homeDir = os.homedir();
+  const packagesDir = path.join(homeDir, '.mcp-python-packages');
 
   // Determine workspace directory
   let workspaceDir: string;
@@ -174,7 +177,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
 
     // Install packages if requested
     if (install_packages && install_packages.length > 0) {
-      const installResult = await installPythonPackages(packagesDir, install_packages, timeout_ms);
+      const installResult = await installPythonPackages(packagesDir, install_packages, timeout_ms, force_reinstall);
       if (installResult.isError) {
         // Clean up
         await fs.rm(tempDir, { recursive: true, force: true });
@@ -748,12 +751,59 @@ function buildMinimalEnvironment(): Record<string, string> {
 }
 
 /**
+ * Check if packages are already installed in the packages directory
+ * Returns true if all packages are found, false otherwise
+ */
+async function checkPackagesInstalled(packagesDir: string, packages: string[]): Promise<boolean> {
+  try {
+    // Check if packages directory exists
+    const dirStats = await fs.stat(packagesDir);
+    if (!dirStats.isDirectory()) {
+      return false;
+    }
+
+    // Read directory contents
+    const dirContents = await fs.readdir(packagesDir);
+    
+    // For each package, check if it exists in the directory
+    // Package names may have version specifiers, so we need to extract the base name
+    for (const pkg of packages) {
+      // Extract package name without version specifiers
+      // Examples: "pandas==2.0.0" -> "pandas", "numpy>=1.20" -> "numpy", "openpyxl" -> "openpyxl"
+      const basePackageName = pkg.split(/[<>=![\]]/)[0].trim().toLowerCase();
+      
+      // Check if any directory matches this package name
+      // Python packages can be installed as either:
+      // 1. package_name (directory)
+      // 2. package_name-version.dist-info (metadata directory)
+      const packageFound = dirContents.some(item => {
+        const itemLower = item.toLowerCase();
+        return itemLower === basePackageName || 
+               itemLower.startsWith(basePackageName + '-') ||
+               itemLower === basePackageName.replace(/-/g, '_') ||
+               itemLower.startsWith(basePackageName.replace(/-/g, '_') + '-');
+      });
+      
+      if (!packageFound) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch {
+    // If any error occurs (directory doesn't exist, permission issues, etc.), assume not installed
+    return false;
+  }
+}
+
+/**
  * Install Python packages using pip
  */
 async function installPythonPackages(
   packagesDir: string,
   packages: string[],
-  timeout_ms: number
+  timeout_ms: number,
+  force_reinstall: boolean = false
 ): Promise<ServerResult> {
   const pythonCmd = await findPythonCommand();
   if (!pythonCmd) {
@@ -789,6 +839,33 @@ async function installPythonPackages(
           text: `Error: Invalid package name '${pkg}'. Package names may only contain letters, digits, '_', '.', '-', and version specifiers ([, ], !, =, <, >, ,).`
         }],
         isError: true
+      };
+    }
+  }
+
+  // Create persistent packages directory if it doesn't exist
+  try {
+    await fs.mkdir(packagesDir, { recursive: true });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      content: [{
+        type: "text",
+        text: `Error: Failed to create package cache directory at ${packagesDir}: ${errorMessage}`
+      }],
+      isError: true
+    };
+  }
+
+  // Check if packages are already installed (unless force_reinstall is true)
+  if (!force_reinstall) {
+    const allPackagesInstalled = await checkPackagesInstalled(packagesDir, packages);
+    if (allPackagesInstalled) {
+      return {
+        content: [{
+          type: "text",
+          text: `Using cached packages: ${packages.join(', ')}\n\nPackages are already installed in cache directory.\nUse force_reinstall=true to reinstall.`
+        }]
       };
     }
   }
