@@ -769,6 +769,12 @@ function buildMinimalEnvironment(): Record<string, string> {
 /**
  * Check if packages are already installed in the packages directory
  * Returns true if all packages are found, false otherwise
+ * 
+ * LIMITATION: This function only checks for package presence, not versions.
+ * If a package has a version specifier (e.g., pandas==2.0.0), it will be
+ * considered "installed" even if a different version is cached. This is
+ * intentional for simplicity and performance - users should use force_reinstall=true
+ * when they need to change package versions.
  */
 async function checkPackagesInstalled(packagesDir: string, packages: string[]): Promise<boolean> {
   try {
@@ -787,6 +793,19 @@ async function checkPackagesInstalled(packagesDir: string, packages: string[]): 
       // Extract package name without version specifiers
       // Examples: "pandas==2.0.0" -> "pandas", "numpy>=1.20" -> "numpy", "openpyxl" -> "openpyxl"
       const basePackageName = pkg.split(/[<>=!\[\]]/)[0].trim().toLowerCase();
+      
+      // If the package request includes a version specifier, always reinstall
+      // to ensure the correct version is installed. This prevents version conflicts
+      // where pandas==2.0.0 is requested but pandas==1.5.0 is cached.
+      const hasVersionSpecifier = pkg.includes('==') || pkg.includes('>=') || 
+                                   pkg.includes('<=') || pkg.includes('>') || 
+                                   pkg.includes('<') || pkg.includes('!=') ||
+                                   pkg.includes('['); // for extras like "package[extra]"
+      
+      if (hasVersionSpecifier) {
+        // Version-specific requests always trigger reinstall to ensure correct version
+        return false;
+      }
       
       // Check if any directory matches this package name
       // Python packages can be installed as either:

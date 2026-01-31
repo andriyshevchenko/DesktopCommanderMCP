@@ -114,25 +114,26 @@ async function testPackageCaching() {
     failedTests++;
   }
 
-  // Test 4: Verify packages persist across executions (no install_packages parameter)
-  console.log("Test 4: Using cached packages without install_packages parameter");
+  // Test 4: Verify that packages are accessible when specified in install_packages
+  // even if they were previously cached (this tests that PYTHONPATH is set correctly)
+  console.log("Test 4: Verify cached packages are accessible via PYTHONPATH");
   try {
     const result = await executePythonCode({
       code: "import six\nprint(f'six module available from persistent cache: {six.__version__}')",
+      install_packages: ["six"], // Explicitly specify to ensure PYTHONPATH is set
       timeout_ms: 30000
     });
     console.log("Result:", JSON.stringify(result, null, 2));
     
     if (result.isError) {
-      // This is actually expected to fail if packages are not in PYTHONPATH when not using install_packages
-      // But our implementation should keep them in the persistent cache directory
-      console.log("⚠ Test 4: Package not available without install_packages parameter");
-      console.log("  This is expected behavior - packages need to be specified in install_packages\n");
+      console.error("✗ Test 4 failed - Package should be accessible when specified in install_packages");
+      failedTests++;
     } else {
-      console.log("✓ Test 4 passed - Package available from persistent cache\n");
+      console.log("✓ Test 4 passed - Package available from persistent cache via PYTHONPATH\n");
     }
   } catch (error) {
-    console.log("⚠ Test 4: Package not available, which is expected behavior\n");
+    console.error("✗ Test 4 failed:", error);
+    failedTests++;
   }
 
   console.log("=== Package Caching Tests Completed ===");
