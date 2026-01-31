@@ -30,7 +30,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     };
   }
 
-  const { code, target_directory, install_packages, workspace, return_format } = parsed.data;
+  const { code, target_directory, install_packages, workspace, return_format, force_reinstall } = parsed.data;
   
   // Auto-detect timeout: 120s if installing packages, 30s otherwise
   // If user explicitly sets a numeric timeout, always respect it
@@ -41,11 +41,14 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     timeout_ms = parsed.data.timeout_ms;
   }
 
-  // Create a temporary directory for this execution
+  // Create a temporary directory for this execution (for script file only)
   const sessionId = `python-exec-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const tempDir = path.join(os.tmpdir(), sessionId);
-  const packagesDir = path.join(tempDir, 'packages');
   const scriptPath = path.join(tempDir, 'script.py');
+  
+  // Use persistent package cache directory for all package installations
+  const homeDir = os.homedir();
+  const packagesDir = path.join(homeDir, '.mcp-python-packages');
 
   // Determine workspace directory
   let workspaceDir: string;
@@ -173,12 +176,17 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
     await fs.writeFile(scriptPath, wrapperCode, 'utf8');
 
     // Install packages if requested
+    let installStatusMessage = '';
     if (install_packages && install_packages.length > 0) {
-      const installResult = await installPythonPackages(packagesDir, install_packages, timeout_ms);
+      const installResult = await installPythonPackages(packagesDir, install_packages, timeout_ms, force_reinstall);
       if (installResult.isError) {
         // Clean up
         await fs.rm(tempDir, { recursive: true, force: true });
         return installResult;
+      }
+      // Store installation status message to include in output
+      if (installResult.content && installResult.content[0]) {
+        installStatusMessage = installResult.content[0].text || '';
       }
     }
 
@@ -187,7 +195,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
 
     // Format result based on return_format
     let finalResult: ServerResult;
-    if (return_format === "detailed" && !result.isError && result.content && result.content.length > 0) {
+    if (return_format === "detailed" && result.content && result.content.length > 0) {
       // Add detailed information including workspace path
       const firstContentItem = result.content[0];
       const baseText = firstContentItem && typeof firstContentItem.text === 'string'
@@ -198,11 +206,22 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
         `\nWorkspace: file://${resolvedTargetDir.replace(/\\/g, '/')}` +
         `\nTimeout: ${timeout_ms}ms` +
         (install_packages && install_packages.length > 0 ? 
-          `\nInstalled packages: ${install_packages.join(', ')}` : '');
+          `\nInstalled packages: ${install_packages.join(', ')}` : '') +
+        (installStatusMessage ? `\n\n${installStatusMessage}` : '');
       
       finalResult = {
         content: [{ type: "text", text: detailedText }],
-        isError: false
+        isError: result.isError
+      };
+    } else if (installStatusMessage && result.content && result.content.length > 0) {
+      // For simple mode, prepend installation status to the output (even on errors for context)
+      const firstContentItem = result.content[0];
+      const baseText = firstContentItem && typeof firstContentItem.text === 'string'
+        ? firstContentItem.text
+        : '';
+      finalResult = {
+        content: [{ type: "text", text: `${installStatusMessage}\n\n--- Script Output ---\n${baseText}` }],
+        isError: result.isError
       };
     } else {
       finalResult = result;
@@ -748,12 +767,88 @@ function buildMinimalEnvironment(): Record<string, string> {
 }
 
 /**
+ * Check if packages are already installed in the packages directory
+ * Returns true if all packages are found, false otherwise
+ * 
+ * NOTE: This helper only verifies that package directories are present; it does
+ * not inspect installed package metadata to compare specific versions.
+ * If any requested package includes a version specifier (e.g., "pandas==2.0.0"),
+ * this function will treat the packages as not installed (return false) so the
+ * caller can trigger a fresh installation with the desired versions.
+ */
+async function checkPackagesInstalled(packagesDir: string, packages: string[]): Promise<boolean> {
+  try {
+    // Check if packages directory exists
+    const dirStats = await fs.stat(packagesDir);
+    if (!dirStats.isDirectory()) {
+      return false;
+    }
+
+    // Read directory contents
+    const dirContents = await fs.readdir(packagesDir);
+    
+    // For each package, check if it exists in the directory
+    // Package names may have version specifiers, so we need to extract the base name
+    for (const pkg of packages) {
+      // Extract package name without version specifiers
+      // Examples: "pandas==2.0.0" -> "pandas", "numpy>=1.20" -> "numpy", "openpyxl" -> "openpyxl"
+      const basePackageName = pkg.split(/==|>=|<=|!=|>|<|\[/)[0].trim().toLowerCase();
+      
+      // If the package request includes a version specifier, always reinstall
+      // to ensure the correct version is installed. This prevents version conflicts
+      // where pandas==2.0.0 is requested but pandas==1.5.0 is cached.
+      // Note: Square brackets denote extras (e.g., "requests[security]"), not versions,
+      // but we exclude them from the split pattern since they don't indicate version constraints.
+      const hasVersionSpecifier = pkg.includes('==') || pkg.includes('>=') || 
+                                   pkg.includes('<=') || pkg.includes('>') || 
+                                   pkg.includes('<') || pkg.includes('!=');
+      
+      if (hasVersionSpecifier) {
+        // Version-specific requests always trigger reinstall to ensure correct version
+        return false;
+      }
+      
+      // Check if any directory matches this package name
+      // Python packages can be installed as either:
+      // 1. package_name (directory)
+      // 2. package_name-version.dist-info (metadata directory)
+      const packageFound = dirContents.some(item => {
+        const itemLower = item.toLowerCase();
+        return itemLower === basePackageName || 
+               itemLower.startsWith(basePackageName + '-') ||
+               itemLower === basePackageName.replace(/-/g, '_') ||
+               itemLower.startsWith(basePackageName.replace(/-/g, '_') + '-');
+      });
+      
+      if (!packageFound) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error: unknown) {
+    // If any error occurs (directory doesn't exist, permission issues, etc.), assume not installed.
+    // Log unexpected errors (e.g. permission issues) to aid debugging.
+    const err = error as NodeJS.ErrnoException;
+    if (err && err.code !== 'ENOENT') {
+      console.error(
+        'checkPackagesInstalled: failed to inspect packages directory %s:',
+        packagesDir,
+        error
+      );
+    }
+    return false;
+  }
+}
+
+/**
  * Install Python packages using pip
  */
 async function installPythonPackages(
   packagesDir: string,
   packages: string[],
-  timeout_ms: number
+  timeout_ms: number,
+  force_reinstall: boolean = false
 ): Promise<ServerResult> {
   const pythonCmd = await findPythonCommand();
   if (!pythonCmd) {
@@ -792,6 +887,49 @@ async function installPythonPackages(
       };
     }
   }
+
+  // Create persistent packages directory if it doesn't exist
+  try {
+    await fs.mkdir(packagesDir, { recursive: true });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      content: [{
+        type: "text",
+        text: `Error: Failed to create package cache directory at ${packagesDir}: ${errorMessage}`
+      }],
+      isError: true
+    };
+  }
+
+  // Check if packages are already installed (unless force_reinstall is true)
+  if (!force_reinstall) {
+    const allPackagesInstalled = await checkPackagesInstalled(packagesDir, packages);
+    if (allPackagesInstalled) {
+      return {
+        content: [{
+          type: "text",
+          text: `Using cached packages: ${packages.join(', ')}\n\nPackages are already installed in cache directory.\nUse force_reinstall=true to reinstall.`
+        }]
+      };
+    }
+  }
+
+  /**
+   * NOTE ON CONCURRENCY:
+   * 
+   * This code invokes "pip install" with a shared target directory (packagesDir).
+   * If executePythonCode (or the underlying package installation logic) is invoked
+   * concurrently with the same packagesDir and overlapping package sets, multiple
+   * processes may all decide that packages are missing and attempt to install them
+   * at the same time. While pip has some internal locking, this is not guaranteed
+   * to be safe in all environments and may lead to installation failures or a
+   * corrupted package cache.
+   * 
+   * Callers that may trigger concurrent installations should ensure serialization
+   * at a higher level (for example, by using an external lock, single worker, or
+   * separate packagesDir per concurrent execution) before relying on this behavior.
+   */
 
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];

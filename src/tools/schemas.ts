@@ -224,6 +224,7 @@ export const GetRecentToolCallsArgsSchema = z.object({
 // - Custom workspace: Provide a custom path to workspace parameter for a specific directory
 // - Detailed format: Set return_format="detailed" to include workspace path and execution stats
 // - UTF-8 encoding: Automatically enforced on Windows to prevent charmap codec errors
+// - Package caching: Packages are cached in ~/.mcp-python-packages across all executions (use force_reinstall to override)
 export const ExecutePythonCodeArgsSchema = z.object({
   code: z.string().trim().min(1, { message: "code must not be empty" }),
   target_directory: z.string().optional(),
@@ -243,6 +244,7 @@ export const ExecutePythonCodeArgsSchema = z.object({
         }),
     )
     .optional(),
+  force_reinstall: z.boolean().optional().default(false),  // Force reinstall packages even if cached
   workspace: z.union([
     z.literal("persistent"),  // Use ~/.desktop-commander/python-workspace (persists across executions)
     z.literal("temp"),        // Use temporary directory (default, cleaned up after execution)

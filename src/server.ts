@@ -993,11 +993,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         FEATURES:
                         - Automatic package installation with pip (internet access required)
+                        - Package caching: Packages are cached in ~/.mcp-python-packages and reused across all executions (use force_reinstall to override)
                         - Auto-timeout: 120s when installing packages, 30s otherwise (or use timeout_ms="auto")
                         - Persistent workspace: Files persist across executions (set workspace="persistent")
                         - UTF-8 encoding: Enforced on Windows to prevent charmap codec errors
                         - Filesystem access restrictions (best-effort) to target directory and workspace
-                        - Packages installed to separate session-specific directory
                         - Detailed output format: Include workspace path and execution stats (set return_format="detailed")
                         
                         SECURITY:
@@ -1012,7 +1012,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         - code: Python code to execute (required)
                         - target_directory: Working directory with read/write access (optional; if omitted, uses workspace directory; if provided, overrides workspace parameter)
                         - timeout_ms: Execution timeout in milliseconds (optional, default: "auto" for smart detection - 120s with packages, 30s without)
-                        - install_packages: Array of pip package names to install before execution (optional, auto-extends timeout to 120s)
+                        - install_packages: Array of pip package names to install before execution (optional, cached automatically for future use)
+                        - force_reinstall: Force reinstall packages even if cached (optional, default: false)
                         - workspace: "persistent" (~/.desktop-commander/python-workspace), "temp" (default, cleaned after), or custom path (optional; ignored if target_directory is set)
                         - return_format: "simple" (default, just output) or "detailed" (includes workspace path, timeout, packages) (optional)
                         
@@ -1023,19 +1024,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         1. Simple calculation:
                            code: "print(2 + 2)"
                         
-                        2. File analysis with pandas (auto-timeout):
+                        2. File analysis with pandas (first run installs, subsequent runs use cache):
                            code: "import pandas as pd\\ndf = pd.read_csv('data.csv')\\nprint(df.head())"
                            target_directory: "/path/to/data"
                            install_packages: ["pandas"]
-                           // Timeout automatically extended to 120s due to package installation
+                           // First execution: ~120s (installs pandas)
+                           // Subsequent executions: <1s (uses cached pandas)
                         
-                        3. Persistent workspace for multi-step analysis:
+                        3. Force reinstall packages:
+                           code: "import pandas as pd\\nprint(pd.__version__)"
+                           install_packages: ["pandas"]
+                           force_reinstall: true
+                           // Forces reinstallation of pandas even if already cached
+                        
+                        4. Persistent workspace for multi-step analysis:
                            code: "import pandas as pd\\ndf = pd.DataFrame({'x': [1,2,3]})\\ndf.to_csv('analysis.csv')"
                            workspace: "persistent"
                            install_packages: ["pandas"]
                            // Files persist in ~/.desktop-commander/python-workspace for next execution
                         
-                        4. Detailed execution info:
+                        5. Detailed execution info:
                            code: "print('Processing complete')"
                            return_format: "detailed"
                            // Returns output plus workspace path, timeout, and package info
