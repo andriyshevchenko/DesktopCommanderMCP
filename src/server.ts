@@ -1033,7 +1033,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         3. Force reinstall packages:
                            code: "import pandas as pd\\nprint(pd.__version__)"
-                           install_packages: ["pandas==2.0.0"]
+                           install_packages: ["pandas"]
                            force_reinstall: true
                            // Forces reinstallation of pandas even if already cached
                         
