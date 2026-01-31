@@ -36,7 +36,7 @@ async function testVersionSpecifiers() {
     if (result1.isError) {
       console.error("✗ Test 1 failed");
       failedTests++;
-    } else if (result1.content[0].text.includes("Successfully installed")) {
+    } else if (result1.content?.[0]?.text?.includes("Successfully installed")) {
       console.log("✓ Test 1 passed - Package installed\n");
     } else {
       console.log("⚠ Test 1 uncertain\n");
@@ -57,7 +57,7 @@ async function testVersionSpecifiers() {
     });
     const duration2 = Date.now() - start2;
     console.log(`Duration: ${duration2}ms`);
-    const output2 = result2.content[0].text;
+    const output2 = result2.content?.[0]?.text ?? '';
     
     if (output2.includes("Using cached packages")) {
       console.log("✓ Test 2 passed - Used cache (as expected)\n");
@@ -81,7 +81,7 @@ async function testVersionSpecifiers() {
     });
     const duration3 = Date.now() - start3;
     console.log(`Duration: ${duration3}ms`);
-    const output3 = result3.content[0].text;
+    const output3 = result3.content?.[0]?.text ?? '';
     
     if (output3.includes("Successfully installed") || output3.includes("Requirement already satisfied")) {
       console.log("✓ Test 3 passed - Reinstalled (as expected for version specifier)\n");

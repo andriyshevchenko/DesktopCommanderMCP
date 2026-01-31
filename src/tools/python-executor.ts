@@ -195,7 +195,7 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
 
     // Format result based on return_format
     let finalResult: ServerResult;
-    if (return_format === "detailed" && !result.isError && result.content && result.content.length > 0) {
+    if (return_format === "detailed" && result.content && result.content.length > 0) {
       // Add detailed information including workspace path
       const firstContentItem = result.content[0];
       const baseText = firstContentItem && typeof firstContentItem.text === 'string'
@@ -211,17 +211,17 @@ export async function executePythonCode(args: unknown): Promise<ServerResult> {
       
       finalResult = {
         content: [{ type: "text", text: detailedText }],
-        isError: false
+        isError: result.isError
       };
-    } else if (installStatusMessage && !result.isError && result.content && result.content.length > 0) {
-      // For simple mode, prepend installation status to the output
+    } else if (installStatusMessage && result.content && result.content.length > 0) {
+      // For simple mode, prepend installation status to the output (even on errors for context)
       const firstContentItem = result.content[0];
       const baseText = firstContentItem && typeof firstContentItem.text === 'string'
         ? firstContentItem.text
         : '';
       finalResult = {
         content: [{ type: "text", text: `${installStatusMessage}\n\n--- Script Output ---\n${baseText}` }],
-        isError: false
+        isError: result.isError
       };
     } else {
       finalResult = result;
@@ -770,11 +770,11 @@ function buildMinimalEnvironment(): Record<string, string> {
  * Check if packages are already installed in the packages directory
  * Returns true if all packages are found, false otherwise
  * 
- * LIMITATION: This function only checks for package presence, not versions.
- * If a package has a version specifier (e.g., pandas==2.0.0), it will be
- * considered "installed" even if a different version is cached. This is
- * intentional for simplicity and performance - users should use force_reinstall=true
- * when they need to change package versions.
+ * NOTE: This helper only verifies that package directories are present; it does
+ * not inspect installed package metadata to compare specific versions.
+ * If any requested package includes a version specifier (e.g., "pandas==2.0.0"),
+ * this function will treat the packages as not installed (return false) so the
+ * caller can trigger a fresh installation with the desired versions.
  */
 async function checkPackagesInstalled(packagesDir: string, packages: string[]): Promise<boolean> {
   try {
@@ -792,15 +792,16 @@ async function checkPackagesInstalled(packagesDir: string, packages: string[]): 
     for (const pkg of packages) {
       // Extract package name without version specifiers
       // Examples: "pandas==2.0.0" -> "pandas", "numpy>=1.20" -> "numpy", "openpyxl" -> "openpyxl"
-      const basePackageName = pkg.split(/[<>=!\[\]]/)[0].trim().toLowerCase();
+      const basePackageName = pkg.split(/==|>=|<=|!=|>|<|\[/)[0].trim().toLowerCase();
       
       // If the package request includes a version specifier, always reinstall
       // to ensure the correct version is installed. This prevents version conflicts
       // where pandas==2.0.0 is requested but pandas==1.5.0 is cached.
+      // Note: Square brackets denote extras (e.g., "requests[security]"), not versions,
+      // but we exclude them from the split pattern since they don't indicate version constraints.
       const hasVersionSpecifier = pkg.includes('==') || pkg.includes('>=') || 
                                    pkg.includes('<=') || pkg.includes('>') || 
-                                   pkg.includes('<') || pkg.includes('!=') ||
-                                   pkg.includes('['); // for extras like "package[extra]"
+                                   pkg.includes('<') || pkg.includes('!=');
       
       if (hasVersionSpecifier) {
         // Version-specific requests always trigger reinstall to ensure correct version
@@ -825,8 +826,17 @@ async function checkPackagesInstalled(packagesDir: string, packages: string[]): 
     }
     
     return true;
-  } catch {
-    // If any error occurs (directory doesn't exist, permission issues, etc.), assume not installed
+  } catch (error: unknown) {
+    // If any error occurs (directory doesn't exist, permission issues, etc.), assume not installed.
+    // Log unexpected errors (e.g. permission issues) to aid debugging.
+    const err = error as NodeJS.ErrnoException;
+    if (err && err.code !== 'ENOENT') {
+      console.error(
+        'checkPackagesInstalled: failed to inspect packages directory %s:',
+        packagesDir,
+        error
+      );
+    }
     return false;
   }
 }
@@ -904,6 +914,22 @@ async function installPythonPackages(
       };
     }
   }
+
+  /**
+   * NOTE ON CONCURRENCY:
+   * 
+   * This code invokes "pip install" with a shared target directory (packagesDir).
+   * If executePythonCode (or the underlying package installation logic) is invoked
+   * concurrently with the same packagesDir and overlapping package sets, multiple
+   * processes may all decide that packages are missing and attempt to install them
+   * at the same time. While pip has some internal locking, this is not guaranteed
+   * to be safe in all environments and may lead to installation failures or a
+   * corrupted package cache.
+   * 
+   * Callers that may trigger concurrent installations should ensure serialization
+   * at a higher level (for example, by using an external lock, single worker, or
+   * separate packagesDir per concurrent execution) before relying on this behavior.
+   */
 
   return new Promise((resolve) => {
     const args = ['-m', 'pip', 'install', '--target', packagesDir, ...packages];
